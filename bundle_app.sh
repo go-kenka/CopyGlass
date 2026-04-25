@@ -1,14 +1,15 @@
 #!/bin/bash
 
 APP_NAME="CopyGlass"
-BUILD_DIR=".build/debug"
+CONFIGURATION="${CONFIGURATION:-debug}"
+BUILD_DIR=".build/$CONFIGURATION"
 SOURCES_DIR="Sources"
 RESOURCES_DIR="$SOURCES_DIR/Resources"
 APP_BUNDLE="$APP_NAME.app"
 
 # 1. Build
 echo "Building..."
-swift build --disable-sandbox
+swift build --disable-sandbox -c "$CONFIGURATION"
 if [ $? -ne 0 ]; then
     echo "Build failed!"
     exit 1
