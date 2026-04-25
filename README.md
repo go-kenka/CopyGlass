@@ -18,10 +18,11 @@ CopyGlass 是一款面向 macOS 的剪切板管理工具，采用 Swift、SwiftU
 
 ## 预览
 
-```markdown
+历史记录面板
 ![CopyGlass history palette](docs/images/history-palette.png)
+
+设置面板
 ![CopyGlass settings](docs/images/settings.png)
-```
 
 ## 系统要求
 
