@@ -8,18 +8,30 @@ final class ClipboardItemStore {
     private let db = AppDatabase.shared
     
     private init() {}
+
+    private var retentionCutoff: Date? {
+        let days = UserDefaults.standard.integer(forKey: "retentionDays")
+        return HistoryRetentionPolicy.cutoffDate(retentionDays: days == 0 ? 7 : days)
+    }
     
     func fetchRecent(limit: Int) -> [ClipboardItem] {
         do {
             return try db.read { db in
+                let cutoff = retentionCutoff
                 let stmt = try db.prepare("""
                 SELECT id, type, content, rtf, image, date, appBundleID
                 FROM clipboard_items
+                WHERE (? IS NULL OR date >= ?)
                 ORDER BY date DESC
                 LIMIT ?;
                 """)
                 defer { stmt.reset() }
-                stmt.bindInt(Int64(limit), index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
+                if cutoff == nil {
+                    stmt.bindText(nil, index: 1)
+                }
+                stmt.bindInt(Int64(limit), index: 3)
                 
                 var items: [ClipboardItem] = []
                 while stmt.step() == SQLITE_ROW {
@@ -42,14 +54,21 @@ final class ClipboardItemStore {
     func fetchRecentSummaries(limit: Int) -> [ClipboardItemSummary] {
         do {
             return try db.read { db in
+                let cutoff = retentionCutoff
                 let stmt = try db.prepare("""
                 SELECT id, type, content_preview, image_thumb, date, appBundleID
                 FROM clipboard_items
+                WHERE (? IS NULL OR date >= ?)
                 ORDER BY date DESC
                 LIMIT ?;
                 """)
                 defer { stmt.reset() }
-                stmt.bindInt(Int64(limit), index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
+                if cutoff == nil {
+                    stmt.bindText(nil, index: 1)
+                }
+                stmt.bindInt(Int64(limit), index: 3)
                 
                 var items: [ClipboardItemSummary] = []
                 while stmt.step() == SQLITE_ROW {
@@ -100,18 +119,25 @@ final class ClipboardItemStore {
         let like = "%\(q)%"
         do {
             return try db.read { db in
+                let cutoff = retentionCutoff
                 let stmt = try db.prepare("""
                 SELECT id, type, content, rtf, image, date, appBundleID
                 FROM clipboard_items
-                WHERE (search_base LIKE ? ESCAPE '\\')
-                   OR (search_pinyin LIKE ? ESCAPE '\\')
+                WHERE (? IS NULL OR date >= ?)
+                  AND ((search_base LIKE ? ESCAPE '\\')
+                   OR (search_pinyin LIKE ? ESCAPE '\\'))
                 ORDER BY date DESC
                 LIMIT ?;
                 """)
                 defer { stmt.reset() }
-                stmt.bindText(like, index: 1)
-                stmt.bindText(like, index: 2)
-                stmt.bindInt(Int64(limit), index: 3)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
+                if cutoff == nil {
+                    stmt.bindText(nil, index: 1)
+                }
+                stmt.bindText(like, index: 3)
+                stmt.bindText(like, index: 4)
+                stmt.bindInt(Int64(limit), index: 5)
 
                 var items: [ClipboardItem] = []
                 while stmt.step() == SQLITE_ROW {
@@ -137,18 +163,25 @@ final class ClipboardItemStore {
         let like = "%\(q)%"
         do {
             return try db.read { db in
+                let cutoff = retentionCutoff
                 let stmt = try db.prepare("""
                 SELECT id, type, content_preview, image_thumb, date, appBundleID
                 FROM clipboard_items
-                WHERE (search_base LIKE ? ESCAPE '\\')
-                   OR (search_pinyin LIKE ? ESCAPE '\\')
+                WHERE (? IS NULL OR date >= ?)
+                  AND ((search_base LIKE ? ESCAPE '\\')
+                   OR (search_pinyin LIKE ? ESCAPE '\\'))
                 ORDER BY date DESC
                 LIMIT ?;
                 """)
                 defer { stmt.reset() }
-                stmt.bindText(like, index: 1)
-                stmt.bindText(like, index: 2)
-                stmt.bindInt(Int64(limit), index: 3)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
+                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
+                if cutoff == nil {
+                    stmt.bindText(nil, index: 1)
+                }
+                stmt.bindText(like, index: 3)
+                stmt.bindText(like, index: 4)
+                stmt.bindInt(Int64(limit), index: 5)
                 
                 var items: [ClipboardItemSummary] = []
                 while stmt.step() == SQLITE_ROW {
@@ -258,6 +291,17 @@ final class ClipboardItemStore {
                 LIMIT \(limit)
             );
             """)
+            return ()
+        })
+    }
+
+    func pruneExpiredItems() {
+        guard let cutoff = retentionCutoff else { return }
+        db.write({ db in
+            let stmt = try db.prepare("DELETE FROM clipboard_items WHERE date < ?;")
+            defer { stmt.reset() }
+            stmt.bindDouble(cutoff.timeIntervalSince1970, index: 1)
+            _ = stmt.step()
             return ()
         })
     }

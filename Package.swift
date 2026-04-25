@@ -24,6 +24,10 @@ let package = Package(
                 .linkedLibrary("sqlite3"),
                 .linkedFramework("UserNotifications")
             ]
+        ),
+        .testTarget(
+            name: "CopyGlassTests",
+            dependencies: ["CopyGlass"]
         )
     ]
 )

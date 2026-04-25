@@ -11,7 +11,13 @@ class ClipboardManager: ObservableObject {
     
     init() {
         self.lastChangeCount = NSPasteboard.general.changeCount
+        store.pruneExpiredItems()
         history = store.fetchRecent(limit: maxInMemoryItems)
+        NotificationCenter.default.addObserver(self, selector: #selector(retentionSettingsChanged), name: UserDefaults.didChangeNotification, object: nil)
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     func startMonitoring() {
@@ -68,9 +74,15 @@ class ClipboardManager: ObservableObject {
                     self.history.removeLast(self.history.count - self.maxInMemoryItems)
                 }
                 self.store.upsert(item)
+                self.store.pruneExpiredItems()
                 self.store.prune(keep: self.maxOnDiskItems)
             }
         }
+    }
+
+    @objc private func retentionSettingsChanged() {
+        store.pruneExpiredItems()
+        history = store.fetchRecent(limit: maxInMemoryItems)
     }
     
     private func isDuplicate(_ new: ClipboardItem, _ old: ClipboardItem) -> Bool {
