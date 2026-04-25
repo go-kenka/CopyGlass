@@ -9,15 +9,20 @@ enum LiquidGlassStyle {
 extension View {
     @ViewBuilder
     func liquidGlassIfAvailable() -> some View {
+        #if COPYGLASS_ENABLE_LIQUID_GLASS
         if #available(macOS 26.0, *) {
             glassEffect()
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
     
     @ViewBuilder
     func liquidGlassIfAvailable<S: Shape>(_ style: LiquidGlassStyle, in shape: S) -> some View {
+        #if COPYGLASS_ENABLE_LIQUID_GLASS
         if #available(macOS 26.0, *) {
             switch style {
             case .regular:
@@ -30,15 +35,22 @@ extension View {
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
     
     @ViewBuilder
     func backgroundExtensionIfAvailable() -> some View {
+        #if COPYGLASS_ENABLE_LIQUID_GLASS
         if #available(macOS 26.0, *) {
             backgroundExtensionEffect()
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 }
 
@@ -53,6 +65,7 @@ struct LiquidGlassChip: View {
             .padding(.vertical, 6)
             .liquidGlassIfAvailable(isProminent ? .regular : .clear, in: Capsule(style: .continuous))
             .background {
+                #if COPYGLASS_ENABLE_LIQUID_GLASS
                 if #available(macOS 26.0, *) {
                     Color.clear
                 } else {
@@ -63,6 +76,14 @@ struct LiquidGlassChip: View {
                                 .stroke(Color.white.opacity(0.15), lineWidth: 1)
                         }
                 }
+                #else
+                Capsule(style: .continuous)
+                    .fill(.thinMaterial)
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .stroke(Color.white.opacity(0.15), lineWidth: 1)
+                    }
+                #endif
             }
     }
 }
