@@ -51,7 +51,7 @@ struct HistoryItemRow: View {
                     .foregroundStyle(.primary)
                     .lineLimit(2)
                 
-                Text(item.date.formatted(date: .omitted, time: .shortened))
+                Text(HistoryDateFormatter.string(from: item.date))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

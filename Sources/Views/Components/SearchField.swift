@@ -4,6 +4,7 @@ import AppKit
 struct SearchField: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String = "Search"
+    var focusRequest: Int = 0
     
     func makeNSView(context: Context) -> NSSearchField {
         let field = NSSearchField()
@@ -18,6 +19,13 @@ struct SearchField: NSViewRepresentable {
             nsView.stringValue = text
         }
         nsView.placeholderString = placeholder
+        if context.coordinator.lastFocusRequest != focusRequest {
+            context.coordinator.lastFocusRequest = focusRequest
+            DispatchQueue.main.async {
+                nsView.window?.makeFirstResponder(nsView)
+                nsView.currentEditor()?.selectAll(nil)
+            }
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -26,6 +34,7 @@ struct SearchField: NSViewRepresentable {
     
     final class Coordinator: NSObject {
         var text: Binding<String>
+        var lastFocusRequest = 0
         
         init(text: Binding<String>) {
             self.text = text
@@ -36,4 +45,3 @@ struct SearchField: NSViewRepresentable {
         }
     }
 }
-

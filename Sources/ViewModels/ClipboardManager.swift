@@ -11,7 +11,7 @@ class ClipboardManager: ObservableObject {
     
     init() {
         self.lastChangeCount = NSPasteboard.general.changeCount
-        store.pruneExpiredItems()
+        store.pruneExpiredItems(wait: true)
         history = store.fetchRecent(limit: maxInMemoryItems)
         NotificationCenter.default.addObserver(self, selector: #selector(retentionSettingsChanged), name: UserDefaults.didChangeNotification, object: nil)
     }
@@ -81,7 +81,7 @@ class ClipboardManager: ObservableObject {
     }
 
     @objc private func retentionSettingsChanged() {
-        store.pruneExpiredItems()
+        store.pruneExpiredItems(wait: true)
         history = store.fetchRecent(limit: maxInMemoryItems)
     }
     

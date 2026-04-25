@@ -5,12 +5,15 @@ final class HistoryPaletteModel: ObservableObject {
     @Published var selectedID: UUID?
     @Published var filteredIDs: [UUID] = []
     @Published var items: [ClipboardItemSummary] = []
+    @Published var listFocusRequest = 0
+    @Published var searchFocusRequest = 0
     
     func moveSelection(delta: Int) {
         guard !filteredIDs.isEmpty else { return }
         let currentIndex = selectedID.flatMap { filteredIDs.firstIndex(of: $0) } ?? 0
         let next = max(0, min(filteredIDs.count - 1, currentIndex + delta))
         selectedID = filteredIDs[next]
+        listFocusRequest += 1
     }
     
     func ensureSelection() {
@@ -22,6 +25,10 @@ final class HistoryPaletteModel: ObservableObject {
     func resetSelectionToFirst() {
         selectedID = filteredIDs.first
     }
+
+    func focusSearchField() {
+        searchFocusRequest += 1
+    }
 }
 
 final class QuickReplyPaletteModel: ObservableObject {
@@ -29,17 +36,24 @@ final class QuickReplyPaletteModel: ObservableObject {
     @Published var selectedID: QuickReplyItem.ID?
     @Published var filteredIDs: [QuickReplyItem.ID] = []
     @Published var items: [QuickReplyItem] = []
+    @Published var listFocusRequest = 0
+    @Published var searchFocusRequest = 0
     
     func moveSelection(delta: Int) {
         guard !filteredIDs.isEmpty else { return }
         let currentIndex = selectedID.flatMap { filteredIDs.firstIndex(of: $0) } ?? 0
         let next = max(0, min(filteredIDs.count - 1, currentIndex + delta))
         selectedID = filteredIDs[next]
+        listFocusRequest += 1
     }
     
     func ensureSelection() {
         if selectedID == nil {
             selectedID = filteredIDs.first
         }
+    }
+
+    func focusSearchField() {
+        searchFocusRequest += 1
     }
 }

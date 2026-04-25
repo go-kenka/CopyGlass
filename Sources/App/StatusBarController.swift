@@ -202,6 +202,10 @@ class StatusBarController: NSObject {
     }
     
     private func handleHistoryPaletteKey(_ event: NSEvent) -> Bool {
+        if isCommandF(event) {
+            historyPaletteModel.focusSearchField()
+            return true
+        }
         if shouldIgnoreSubmitKey(event, window: historyPaletteController?.window) {
             return false
         }
@@ -230,6 +234,10 @@ class StatusBarController: NSObject {
     }
     
     private func handleQuickReplyPaletteKey(_ event: NSEvent) -> Bool {
+        if isCommandF(event) {
+            quickReplyPaletteModel.focusSearchField()
+            return true
+        }
         if shouldIgnoreSubmitKey(event, window: quickReplyPaletteController?.window) {
             return false
         }
@@ -263,6 +271,11 @@ class StatusBarController: NSObject {
         guard let textView = window?.firstResponder as? NSTextView, textView.isFieldEditor else { return false }
         if textView.hasMarkedText() { return true }
         return true
+    }
+
+    private func isCommandF(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return Int(event.keyCode) == kVK_ANSI_F && flags.contains(.command)
     }
     
     private func showPalette(_ controller: NSWindowController?) {

@@ -18,20 +18,14 @@ final class ClipboardItemStore {
         do {
             return try db.read { db in
                 let cutoff = retentionCutoff
-                let stmt = try db.prepare("""
-                SELECT id, type, content, rtf, image, date, appBundleID
-                FROM clipboard_items
-                WHERE (? IS NULL OR date >= ?)
-                ORDER BY date DESC
-                LIMIT ?;
-                """)
+                let stmt = try db.prepare(ClipboardItemStoreSQL.fetchRecent(summary: false, filteredByRetention: cutoff != nil))
                 defer { stmt.reset() }
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
-                if cutoff == nil {
-                    stmt.bindText(nil, index: 1)
+                if let cutoff {
+                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 1)
+                    stmt.bindInt(Int64(limit), index: 2)
+                } else {
+                    stmt.bindInt(Int64(limit), index: 1)
                 }
-                stmt.bindInt(Int64(limit), index: 3)
                 
                 var items: [ClipboardItem] = []
                 while stmt.step() == SQLITE_ROW {
@@ -55,20 +49,14 @@ final class ClipboardItemStore {
         do {
             return try db.read { db in
                 let cutoff = retentionCutoff
-                let stmt = try db.prepare("""
-                SELECT id, type, content_preview, image_thumb, date, appBundleID
-                FROM clipboard_items
-                WHERE (? IS NULL OR date >= ?)
-                ORDER BY date DESC
-                LIMIT ?;
-                """)
+                let stmt = try db.prepare(ClipboardItemStoreSQL.fetchRecent(summary: true, filteredByRetention: cutoff != nil))
                 defer { stmt.reset() }
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
-                if cutoff == nil {
-                    stmt.bindText(nil, index: 1)
+                if let cutoff {
+                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 1)
+                    stmt.bindInt(Int64(limit), index: 2)
+                } else {
+                    stmt.bindInt(Int64(limit), index: 1)
                 }
-                stmt.bindInt(Int64(limit), index: 3)
                 
                 var items: [ClipboardItemSummary] = []
                 while stmt.step() == SQLITE_ROW {
@@ -116,28 +104,20 @@ final class ClipboardItemStore {
     func search(query: String, limit: Int) -> [ClipboardItem] {
         let q = query.normalizedSearchText()
         if q.isEmpty { return fetchRecent(limit: limit) }
-        let like = "%\(q)%"
+        guard let ftsQuery = ClipboardItemStoreSQL.ftsQuery(for: query) else { return [] }
         do {
             return try db.read { db in
                 let cutoff = retentionCutoff
-                let stmt = try db.prepare("""
-                SELECT id, type, content, rtf, image, date, appBundleID
-                FROM clipboard_items
-                WHERE (? IS NULL OR date >= ?)
-                  AND ((search_base LIKE ? ESCAPE '\\')
-                   OR (search_pinyin LIKE ? ESCAPE '\\'))
-                ORDER BY date DESC
-                LIMIT ?;
-                """)
+                let stmt = try db.prepare(ClipboardItemStoreSQL.search(summary: false, filteredByRetention: cutoff != nil))
                 defer { stmt.reset() }
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
-                if cutoff == nil {
-                    stmt.bindText(nil, index: 1)
+                if let cutoff {
+                    stmt.bindText(ftsQuery, index: 1)
+                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 2)
+                    stmt.bindInt(Int64(limit), index: 3)
+                } else {
+                    stmt.bindText(ftsQuery, index: 1)
+                    stmt.bindInt(Int64(limit), index: 2)
                 }
-                stmt.bindText(like, index: 3)
-                stmt.bindText(like, index: 4)
-                stmt.bindInt(Int64(limit), index: 5)
 
                 var items: [ClipboardItem] = []
                 while stmt.step() == SQLITE_ROW {
@@ -160,28 +140,20 @@ final class ClipboardItemStore {
     func searchSummaries(query: String, limit: Int) -> [ClipboardItemSummary] {
         let q = query.normalizedSearchText()
         if q.isEmpty { return fetchRecentSummaries(limit: limit) }
-        let like = "%\(q)%"
+        guard let ftsQuery = ClipboardItemStoreSQL.ftsQuery(for: query) else { return [] }
         do {
             return try db.read { db in
                 let cutoff = retentionCutoff
-                let stmt = try db.prepare("""
-                SELECT id, type, content_preview, image_thumb, date, appBundleID
-                FROM clipboard_items
-                WHERE (? IS NULL OR date >= ?)
-                  AND ((search_base LIKE ? ESCAPE '\\')
-                   OR (search_pinyin LIKE ? ESCAPE '\\'))
-                ORDER BY date DESC
-                LIMIT ?;
-                """)
+                let stmt = try db.prepare(ClipboardItemStoreSQL.search(summary: true, filteredByRetention: cutoff != nil))
                 defer { stmt.reset() }
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 1)
-                stmt.bindDouble(cutoff?.timeIntervalSince1970 ?? 0, index: 2)
-                if cutoff == nil {
-                    stmt.bindText(nil, index: 1)
+                if let cutoff {
+                    stmt.bindText(ftsQuery, index: 1)
+                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 2)
+                    stmt.bindInt(Int64(limit), index: 3)
+                } else {
+                    stmt.bindText(ftsQuery, index: 1)
+                    stmt.bindInt(Int64(limit), index: 2)
                 }
-                stmt.bindText(like, index: 3)
-                stmt.bindText(like, index: 4)
-                stmt.bindInt(Int64(limit), index: 5)
                 
                 var items: [ClipboardItemSummary] = []
                 while stmt.step() == SQLITE_ROW {
@@ -295,15 +267,19 @@ final class ClipboardItemStore {
         })
     }
 
-    func pruneExpiredItems() {
+    func pruneExpiredItems(wait: Bool = false) {
         guard let cutoff = retentionCutoff else { return }
-        db.write({ db in
+        let block: (SQLiteDatabase) throws -> Void = { db in
             let stmt = try db.prepare("DELETE FROM clipboard_items WHERE date < ?;")
             defer { stmt.reset() }
             stmt.bindDouble(cutoff.timeIntervalSince1970, index: 1)
             _ = stmt.step()
-            return ()
-        })
+        }
+        if wait {
+            try? db.writeAndWait(block)
+        } else {
+            db.write(block)
+        }
     }
     
     func clear() {

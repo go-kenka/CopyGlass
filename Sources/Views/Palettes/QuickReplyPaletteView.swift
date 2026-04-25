@@ -8,6 +8,7 @@ struct QuickReplyPaletteView: View {
     let onCancel: () -> Void
     @Environment(\.appLanguage) private var lang
     @State private var queryTaskID = UUID()
+    @FocusState private var listFocused: Bool
     
     var body: some View {
         ZStack {
@@ -21,7 +22,7 @@ struct QuickReplyPaletteView: View {
                     Text(L10n.t(.quickReply, lang: lang))
                         .font(.headline)
                     Spacer()
-                    SearchField(text: $model.query, placeholder: L10n.t(.search, lang: lang))
+                    SearchField(text: $model.query, placeholder: L10n.t(.search, lang: lang), focusRequest: model.searchFocusRequest)
                         .frame(width: 220)
                 }
                 .padding(.horizontal, 14)
@@ -42,11 +43,16 @@ struct QuickReplyPaletteView: View {
                     }
                     .listStyle(.inset)
                     .scrollContentBackground(.hidden)
+                    .focusable()
+                    .focused($listFocused)
                     .onChange(of: model.selectedID) { _, id in
                         guard let id else { return }
                         withAnimation(.easeOut(duration: 0.08)) {
                             proxy.scrollTo(id, anchor: .center)
                         }
+                    }
+                    .onChange(of: model.listFocusRequest) { _, _ in
+                        listFocused = true
                     }
                 }
             }

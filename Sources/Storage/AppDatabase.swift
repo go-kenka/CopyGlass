@@ -4,10 +4,12 @@ final class AppDatabase {
     static let shared = AppDatabase()
     
     private let queue = DispatchQueue(label: "copyglass.db", qos: .utility)
-    private let expectedSchemaVersion: Int32 = 3
+    private let queueKey = DispatchSpecificKey<Void>()
+    private let expectedSchemaVersion: Int32 = 4
     private let db: SQLiteDatabase
     
     private init() {
+        queue.setSpecific(key: queueKey, value: ())
         let url = AppPaths.applicationSupportDirectory().appendingPathComponent("copyglass.sqlite")
         let fm = FileManager.default
         
@@ -15,7 +17,7 @@ final class AppDatabase {
             do {
                 let probe = try SQLiteDatabase(url: url)
                 let version = (try? probe.userVersion()) ?? 0
-                if version != expectedSchemaVersion {
+                if version > expectedSchemaVersion {
                     try? fm.removeItem(at: url)
                 }
             } catch {
@@ -41,8 +43,18 @@ final class AppDatabase {
             }
         }
     }
+
+    func writeAndWait<T>(_ block: (SQLiteDatabase) throws -> T) rethrows -> T {
+        if DispatchQueue.getSpecific(key: queueKey) != nil {
+            return try block(db)
+        }
+        return try queue.sync {
+            try block(db)
+        }
+    }
     
     private func setupSchema() throws {
+        let currentVersion = (try? db.userVersion()) ?? 0
         try db.exec("""
         CREATE TABLE IF NOT EXISTS clipboard_items (
             id TEXT PRIMARY KEY,
@@ -61,6 +73,13 @@ final class AppDatabase {
         try db.exec("CREATE INDEX IF NOT EXISTS idx_clipboard_items_date ON clipboard_items(date DESC);")
         try db.exec("CREATE INDEX IF NOT EXISTS idx_clipboard_items_search_base ON clipboard_items(search_base);")
         try db.exec("CREATE INDEX IF NOT EXISTS idx_clipboard_items_search_pinyin ON clipboard_items(search_pinyin);")
+        try db.exec(ClipboardItemStoreSQL.createFTSTable)
+        try db.exec(ClipboardItemStoreSQL.createFTSInsertTrigger)
+        try db.exec(ClipboardItemStoreSQL.createFTSDeleteTrigger)
+        try db.exec(ClipboardItemStoreSQL.createFTSUpdateTrigger)
+        if currentVersion < expectedSchemaVersion {
+            try db.exec(ClipboardItemStoreSQL.rebuildFTS)
+        }
         
         try db.exec("""
         CREATE TABLE IF NOT EXISTS quick_replies (
