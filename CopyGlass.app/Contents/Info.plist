@@ -7,7 +7,7 @@
     <key>CFBundleExecutable</key>
     <string>CopyGlass</string>
     <key>CFBundleIdentifier</key>
-    <string>com.example.CopyGlass</string>
+    <string>com.github.go-kenka.CopyGlass</string>
     <key>CFBundleIconFile</key>
     <string>CopyGlass.icns</string>
     <key>CFBundleInfoDictionaryVersion</key>
