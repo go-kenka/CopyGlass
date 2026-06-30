@@ -69,6 +69,13 @@ final class SQLiteDatabase {
     func setUserVersion(_ version: Int32) throws {
         try exec("PRAGMA user_version = \(version);")
     }
+
+    func scalarInt64(_ sql: String) throws -> Int64 {
+        let stmt = try prepare(sql)
+        defer { stmt.reset() }
+        guard stmt.step() == SQLITE_ROW else { return 0 }
+        return stmt.columnInt64(0)
+    }
 }
 
 final class SQLiteStatement {

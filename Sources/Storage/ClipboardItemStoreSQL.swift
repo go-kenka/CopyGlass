@@ -37,6 +37,8 @@ enum ClipboardItemStoreSQL {
 
     static let rebuildFTS = "INSERT INTO clipboard_items_fts(clipboard_items_fts) VALUES ('rebuild');"
 
+    static let pruneOversizedImages = "DELETE FROM clipboard_items WHERE type = 'image' AND length(image) > ?;"
+
     static func fetchRecent(summary: Bool, filteredByRetention: Bool) -> String {
         let columns = summary
             ? "id, type, content_preview, image_thumb, date, appBundleID"

@@ -306,18 +306,18 @@ struct HistoryItemsView: View {
         .detailSurface()
     }
     
-    private var filteredHistory: [ClipboardItem] {
+    private var filteredHistory: [ClipboardItemSummary] {
         if searchText.isEmpty {
             return clipboardManager.history
         } else {
             return clipboardManager.history.filter { item in
-                item.content?.localizedCaseInsensitiveContains(searchText) ?? false
+                item.previewText?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
     }
     
-    private func copyItem(_ item: ClipboardItem) {
-        clipboardManager.copyToPasteboard(item: item)
+    private func copyItem(_ item: ClipboardItemSummary) {
+        guard clipboardManager.copyToPasteboard(id: item.id) else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             PasteboardHelper.paste()
             NSApp.hide(nil)

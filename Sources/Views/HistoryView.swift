@@ -1,15 +1,16 @@
 import SwiftUI
+import AppKit
 
 struct HistoryView: View {
     @ObservedObject var clipboardManager: ClipboardManager
     var searchText: String
     
-    var filteredHistory: [ClipboardItem] {
+    var filteredHistory: [ClipboardItemSummary] {
         if searchText.isEmpty {
             return clipboardManager.history
         } else {
             return clipboardManager.history.filter { item in
-                item.content?.localizedCaseInsensitiveContains(searchText) ?? false
+                item.previewText?.localizedCaseInsensitiveContains(searchText) ?? false
             }
         }
     }
@@ -26,8 +27,8 @@ struct HistoryView: View {
         .detailSurface()
     }
     
-    private func copyItem(_ item: ClipboardItem) {
-        clipboardManager.copyToPasteboard(item: item)
+    private func copyItem(_ item: ClipboardItemSummary) {
+        guard clipboardManager.copyToPasteboard(id: item.id) else { return }
         PasteboardHelper.showCopySuccessToast()
         NSApp.hide(nil)
 
@@ -37,7 +38,7 @@ struct HistoryView: View {
 }
 
 struct HistoryItemRow: View {
-    let item: ClipboardItem
+    let item: ClipboardItemSummary
     
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -70,19 +71,17 @@ struct HistoryItemRow: View {
 }
 
 struct RichTextPreview: View {
-    let item: ClipboardItem
+    let item: ClipboardItemSummary
     
     var body: some View {
-        if item.type == .image, let img = PreviewCache.shared.image(for: item) {
+        if item.type == .image, let data = item.thumbnailData, let img = NSImage(data: data) {
             Image(nsImage: img)
                 .resizable()
                 .scaledToFill()
                 .frame(width: 72, height: 44)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        } else if let ns = PreviewCache.shared.rtfText(for: item) {
-            Text(AttributedString(ns))
-        } else if let content = item.content, !content.isEmpty {
+        } else if let content = item.previewText, !content.isEmpty {
             Text(content)
         } else {
             Text(item.type == .image ? "Image" : "Item")

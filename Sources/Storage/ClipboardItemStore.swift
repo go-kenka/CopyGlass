@@ -9,40 +9,21 @@ final class ClipboardItemStore {
     
     private init() {}
 
+    static func summary(for item: ClipboardItem) -> ClipboardItemSummary {
+        let text = item.content ?? item.displayText
+        return ClipboardItemSummary(
+            id: item.id,
+            type: item.type,
+            previewText: makePreview(text: text),
+            thumbnailData: makeThumbnailData(item: item),
+            date: item.date,
+            appBundleID: item.appBundleID
+        )
+    }
+
     private var retentionCutoff: Date? {
         let days = UserDefaults.standard.integer(forKey: "retentionDays")
         return HistoryRetentionPolicy.cutoffDate(retentionDays: days == 0 ? 7 : days)
-    }
-    
-    func fetchRecent(limit: Int) -> [ClipboardItem] {
-        do {
-            return try db.read { db in
-                let cutoff = retentionCutoff
-                let stmt = try db.prepare(ClipboardItemStoreSQL.fetchRecent(summary: false, filteredByRetention: cutoff != nil))
-                defer { stmt.reset() }
-                if let cutoff {
-                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 1)
-                    stmt.bindInt(Int64(limit), index: 2)
-                } else {
-                    stmt.bindInt(Int64(limit), index: 1)
-                }
-                
-                var items: [ClipboardItem] = []
-                while stmt.step() == SQLITE_ROW {
-                    let id = UUID(uuidString: stmt.columnText(0) ?? "") ?? UUID()
-                    let type = ClipboardType(rawValue: stmt.columnText(1) ?? "text") ?? .text
-                    let content = stmt.columnText(2)
-                    let rtf = stmt.columnData(3)
-                    let image = stmt.columnData(4)
-                    let date = Date(timeIntervalSince1970: stmt.columnDouble(5))
-                    let bundleID = stmt.columnText(6)
-                    items.append(ClipboardItem(id: id, type: type, content: content, rtfData: rtf, imageData: image, date: date, appBundleID: bundleID))
-                }
-                return items
-            }
-        } catch {
-            return []
-        }
     }
     
     func fetchRecentSummaries(limit: Int) -> [ClipboardItemSummary] {
@@ -101,42 +82,6 @@ final class ClipboardItemStore {
         }
     }
 
-    func search(query: String, limit: Int) -> [ClipboardItem] {
-        let q = query.normalizedSearchText()
-        if q.isEmpty { return fetchRecent(limit: limit) }
-        guard let ftsQuery = ClipboardItemStoreSQL.ftsQuery(for: query) else { return [] }
-        do {
-            return try db.read { db in
-                let cutoff = retentionCutoff
-                let stmt = try db.prepare(ClipboardItemStoreSQL.search(summary: false, filteredByRetention: cutoff != nil))
-                defer { stmt.reset() }
-                if let cutoff {
-                    stmt.bindText(ftsQuery, index: 1)
-                    stmt.bindDouble(cutoff.timeIntervalSince1970, index: 2)
-                    stmt.bindInt(Int64(limit), index: 3)
-                } else {
-                    stmt.bindText(ftsQuery, index: 1)
-                    stmt.bindInt(Int64(limit), index: 2)
-                }
-
-                var items: [ClipboardItem] = []
-                while stmt.step() == SQLITE_ROW {
-                    let id = UUID(uuidString: stmt.columnText(0) ?? "") ?? UUID()
-                    let type = ClipboardType(rawValue: stmt.columnText(1) ?? "text") ?? .text
-                    let content = stmt.columnText(2)
-                    let rtf = stmt.columnData(3)
-                    let image = stmt.columnData(4)
-                    let date = Date(timeIntervalSince1970: stmt.columnDouble(5))
-                    let bundleID = stmt.columnText(6)
-                    items.append(ClipboardItem(id: id, type: type, content: content, rtfData: rtf, imageData: image, date: date, appBundleID: bundleID))
-                }
-                return items
-            }
-        } catch {
-            return []
-        }
-    }
-    
     func searchSummaries(query: String, limit: Int) -> [ClipboardItemSummary] {
         let q = query.normalizedSearchText()
         if q.isEmpty { return fetchRecentSummaries(limit: limit) }
@@ -172,12 +117,11 @@ final class ClipboardItemStore {
         }
     }
     
-    func upsert(_ item: ClipboardItem) {
+    func upsert(_ item: ClipboardItem, summary: ClipboardItemSummary? = nil) {
         let text = item.content ?? item.displayText
         let searchBase = text.normalizedSearchText()
         let searchPinyin = text.pinyinSearchText()
-        let preview = makePreview(text: text)
-        let thumb = makeThumbnailData(item: item)
+        let summary = summary ?? Self.summary(for: item)
         db.write({ db in
             let stmt = try db.prepare("""
             INSERT INTO clipboard_items (id, type, content, content_preview, rtf, image, image_thumb, date, appBundleID, search_base, search_pinyin)
@@ -198,10 +142,10 @@ final class ClipboardItemStore {
             stmt.bindText(item.id.uuidString, index: 1)
             stmt.bindText(item.type.rawValue, index: 2)
             stmt.bindText(item.content, index: 3)
-            stmt.bindText(preview, index: 4)
+            stmt.bindText(summary.previewText, index: 4)
             stmt.bindData(item.rtfData, index: 5)
             stmt.bindData(item.imageData, index: 6)
-            stmt.bindData(thumb, index: 7)
+            stmt.bindData(summary.thumbnailData, index: 7)
             stmt.bindDouble(item.date.timeIntervalSince1970, index: 8)
             stmt.bindText(item.appBundleID, index: 9)
             stmt.bindText(searchBase, index: 10)
@@ -211,7 +155,7 @@ final class ClipboardItemStore {
         })
     }
     
-    private func makePreview(text: String) -> String {
+    private static func makePreview(text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return "" }
         let collapsed = trimmed
@@ -224,7 +168,7 @@ final class ClipboardItemStore {
         return String(collapsed.prefix(limit))
     }
     
-    private func makeThumbnailData(item: ClipboardItem) -> Data? {
+    private static func makeThumbnailData(item: ClipboardItem) -> Data? {
         guard item.type == .image, let data = item.imageData, let image = NSImage(data: data) else { return nil }
         guard let rep = bestRepresentation(for: image) else { return nil }
         
@@ -246,7 +190,7 @@ final class ClipboardItemStore {
         return bitmap.representation(using: .png, properties: [:])
     }
     
-    private func bestRepresentation(for image: NSImage) -> NSImageRep? {
+    private static func bestRepresentation(for image: NSImage) -> NSImageRep? {
         if let rep = image.representations.max(by: { $0.pixelsWide * $0.pixelsHigh < $1.pixelsWide * $1.pixelsHigh }) {
             return rep
         }
@@ -281,12 +225,30 @@ final class ClipboardItemStore {
             db.write(block)
         }
     }
+
+    func pruneOversizedImages(maxBytes: Int, wait: Bool = false) {
+        let block: (SQLiteDatabase) throws -> Void = { db in
+            let stmt = try db.prepare(ClipboardItemStoreSQL.pruneOversizedImages)
+            defer { stmt.reset() }
+            stmt.bindInt(Int64(maxBytes), index: 1)
+            _ = stmt.step()
+        }
+        if wait {
+            try? db.writeAndWait(block)
+        } else {
+            db.write(block)
+        }
+    }
     
     func clear() {
         db.write({ db in
             try db.exec("DELETE FROM clipboard_items;")
             return ()
         })
+    }
+
+    func vacuumIfNeeded(wait: Bool = false) {
+        db.vacuumIfNeeded(wait: wait)
     }
     
     func isEmpty() -> Bool {

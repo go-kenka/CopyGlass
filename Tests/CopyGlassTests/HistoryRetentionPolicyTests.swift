@@ -85,4 +85,40 @@ final class HistoryRetentionPolicyTests: XCTestCase {
 
         XCTAssertEqual(model.searchFocusRequest, 1)
     }
+
+    func testClipboardItemSummaryUsesPreviewOnly() {
+        let item = ClipboardItem(
+            id: UUID(),
+            type: .text,
+            content: String(repeating: "x", count: 500),
+            date: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+
+        let summary = ClipboardItemStore.summary(for: item)
+
+        XCTAssertEqual(summary.id, item.id)
+        XCTAssertEqual(summary.type, .text)
+        XCTAssertEqual(summary.previewText?.count, 360)
+        XCTAssertNil(summary.thumbnailData)
+    }
+
+    func testOversizedClipboardImagesAreSkipped() {
+        XCTAssertTrue(ClipboardManager.shouldStoreImageData(byteCount: ClipboardManager.maxStoredImageBytes))
+        XCTAssertFalse(ClipboardManager.shouldStoreImageData(byteCount: ClipboardManager.maxStoredImageBytes + 1))
+    }
+
+    func testOversizedImagePruneDeletesOnlyLargeImages() {
+        let sql = ClipboardItemStoreSQL.pruneOversizedImages
+
+        XCTAssertTrue(sql.contains("type = 'image'"))
+        XCTAssertTrue(sql.contains("length(image) > ?"))
+    }
+
+    func testDatabaseVacuumIsLowFrequencyAndOnlyForLargeFreeSpace() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+
+        XCTAssertTrue(AppDatabase.shouldVacuum(pageCount: 100_000, freelistCount: 40_000, pageSize: 4096, lastVacuumAt: nil, now: now))
+        XCTAssertFalse(AppDatabase.shouldVacuum(pageCount: 100_000, freelistCount: 40_000, pageSize: 4096, lastVacuumAt: now.addingTimeInterval(-60 * 60), now: now))
+        XCTAssertFalse(AppDatabase.shouldVacuum(pageCount: 100_000, freelistCount: 10_000, pageSize: 4096, lastVacuumAt: nil, now: now))
+    }
 }

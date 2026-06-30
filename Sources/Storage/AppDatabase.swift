@@ -2,6 +2,10 @@ import Foundation
 
 final class AppDatabase {
     static let shared = AppDatabase()
+    private static let lastVacuumDefaultsKey = "lastDatabaseVacuumAt"
+    private static let minVacuumInterval: TimeInterval = 24 * 60 * 60
+    private static let minVacuumFreeBytes: Int64 = 128 * 1024 * 1024
+    private static let minVacuumFreeRatio = 0.25
     
     private let queue = DispatchQueue(label: "copyglass.db", qos: .utility)
     private let queueKey = DispatchSpecificKey<Void>()
@@ -50,6 +54,35 @@ final class AppDatabase {
         }
         return try queue.sync {
             try block(db)
+        }
+    }
+
+    static func shouldVacuum(pageCount: Int64, freelistCount: Int64, pageSize: Int64, lastVacuumAt: Date?, now: Date = Date()) -> Bool {
+        guard pageCount > 0, pageSize > 0 else { return false }
+        if let lastVacuumAt, now.timeIntervalSince(lastVacuumAt) < minVacuumInterval {
+            return false
+        }
+        let freeBytes = freelistCount * pageSize
+        let freeRatio = Double(freelistCount) / Double(pageCount)
+        return freeBytes >= minVacuumFreeBytes && freeRatio >= minVacuumFreeRatio
+    }
+
+    func vacuumIfNeeded(wait: Bool = false, now: Date = Date()) {
+        let block: (SQLiteDatabase) throws -> Void = { db in
+            let pageCount = try db.scalarInt64("PRAGMA page_count;")
+            let freelistCount = try db.scalarInt64("PRAGMA freelist_count;")
+            let pageSize = try db.scalarInt64("PRAGMA page_size;")
+            let lastVacuumAt = UserDefaults.standard.object(forKey: Self.lastVacuumDefaultsKey) as? Date
+            guard Self.shouldVacuum(pageCount: pageCount, freelistCount: freelistCount, pageSize: pageSize, lastVacuumAt: lastVacuumAt, now: now) else {
+                return
+            }
+            try db.exec("VACUUM;")
+            UserDefaults.standard.set(now, forKey: Self.lastVacuumDefaultsKey)
+        }
+        if wait {
+            try? writeAndWait(block)
+        } else {
+            write(block)
         }
     }
     
