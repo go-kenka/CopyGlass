@@ -40,6 +40,10 @@ struct HistoryPaletteView: View {
                             )
                                 .id(item.id)
                                 .tag(item.id)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    model.selectedID = item.id
+                                    model.listFocusRequest += 1
+                                })
                                 .onTapGesture(count: 2) {
                                     onPick(item.id)
                                 }
@@ -142,6 +146,7 @@ struct HistoryPaletteRow: View {
             }
         }
         .padding(.vertical, isSelected ? 8 : 4)
+        .interactiveListRow(isSelected: isSelected, usesNativeSelection: true)
     }
     
     private var iconName: String {

@@ -76,6 +76,7 @@ struct QuickReplyRow: View {
             }
         }
         .padding(.vertical, 6)
+        .interactiveListRow()
     }
 }
 

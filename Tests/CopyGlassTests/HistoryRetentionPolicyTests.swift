@@ -121,4 +121,24 @@ final class HistoryRetentionPolicyTests: XCTestCase {
         XCTAssertFalse(AppDatabase.shouldVacuum(pageCount: 100_000, freelistCount: 40_000, pageSize: 4096, lastVacuumAt: now.addingTimeInterval(-60 * 60), now: now))
         XCTAssertFalse(AppDatabase.shouldVacuum(pageCount: 100_000, freelistCount: 10_000, pageSize: 4096, lastVacuumAt: nil, now: now))
     }
+
+    func testInteractiveListRowFeedbackPrefersSelectionOverHover() {
+        XCTAssertEqual(InteractiveListRowStyle.backgroundOpacity(isHovered: false, isSelected: false), 0)
+        XCTAssertEqual(InteractiveListRowStyle.backgroundOpacity(isHovered: true, isSelected: false), 0.10)
+        XCTAssertEqual(InteractiveListRowStyle.backgroundOpacity(isHovered: true, isSelected: true), 0.22)
+    }
+
+    func testInteractiveListRowDoesNotDoubleHighlightNativeSelection() {
+        XCTAssertEqual(
+            InteractiveListRowStyle.backgroundOpacity(isHovered: true, isSelected: true, usesNativeSelection: true),
+            0
+        )
+    }
+
+    func testInteractiveListRowDoesNotAddHoverLayerToNativeSelectionRows() {
+        XCTAssertEqual(
+            InteractiveListRowStyle.backgroundOpacity(isHovered: true, isSelected: false, usesNativeSelection: true),
+            0
+        )
+    }
 }

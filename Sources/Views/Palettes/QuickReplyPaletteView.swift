@@ -33,9 +33,17 @@ struct QuickReplyPaletteView: View {
                 ScrollViewReader { proxy in
                     List(selection: $model.selectedID) {
                         ForEach(model.items) { item in
-                            QuickReplyPaletteRow(item: item, query: model.query)
+                            QuickReplyPaletteRow(
+                                item: item,
+                                query: model.query,
+                                isSelected: model.selectedID == item.id
+                            )
                                 .id(item.id)
                                 .tag(item.id)
+                                .simultaneousGesture(TapGesture().onEnded {
+                                    model.selectedID = item.id
+                                    model.listFocusRequest += 1
+                                })
                                 .onTapGesture(count: 2) {
                                     onPick(item)
                                 }
@@ -104,6 +112,7 @@ struct QuickReplyPaletteView: View {
 struct QuickReplyPaletteRow: View {
     let item: QuickReplyItem
     let query: String
+    let isSelected: Bool
     
     var body: some View {
         HStack(spacing: 10) {
@@ -137,6 +146,7 @@ struct QuickReplyPaletteRow: View {
             }
         }
         .padding(.vertical, 2)
+        .interactiveListRow(isSelected: isSelected, usesNativeSelection: true)
     }
 
     private func highlightedText(_ text: String, query: String, baseColor: NSColor) -> NSAttributedString {

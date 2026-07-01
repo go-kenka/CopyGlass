@@ -59,6 +59,7 @@ struct HistoryItemRow: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)
+        .interactiveListRow()
     }
     
     var iconName: String {
