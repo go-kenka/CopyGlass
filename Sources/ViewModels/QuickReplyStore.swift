@@ -23,6 +23,15 @@ final class QuickReplyStore: ObservableObject {
         store.upsert(item)
     }
     
+    func update(_ item: QuickReplyItem) {
+        if let index = items.firstIndex(where: { $0.id == item.id }) {
+            items[index] = item
+        } else {
+            items.append(item)
+        }
+        store.upsert(item)
+    }
+    
     func delete(_ item: QuickReplyItem) {
         items.removeAll { $0.id == item.id }
         store.delete(id: item.id)

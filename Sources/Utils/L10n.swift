@@ -75,7 +75,10 @@ enum L10nKey: String, CaseIterable {
     case save
     
     case newQuickReply
+    case editQuickReply
     case title
+    case content
+    case edit
     case shortcutOptional
     
     case aboutSubtitle
@@ -247,7 +250,10 @@ enum L10n {
         .save: "Save",
         
         .newQuickReply: "New Quick Reply",
+        .editQuickReply: "Edit Quick Reply",
         .title: "Title",
+        .content: "Content",
+        .edit: "Edit",
         .shortcutOptional: "Shortcut (optional)",
         
         .aboutSubtitle: "Version and highlights.",
@@ -407,7 +413,10 @@ enum L10n {
         .save: "保存",
         
         .newQuickReply: "新增快捷回复",
+        .editQuickReply: "编辑快捷回复",
         .title: "标题",
+        .content: "内容",
+        .edit: "编辑",
         .shortcutOptional: "快捷键（可选）",
         
         .aboutSubtitle: "版本信息与功能亮点。",
