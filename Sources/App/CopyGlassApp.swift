@@ -31,6 +31,7 @@ struct CopyGlassApp: App {
                 .background(LaunchWindowSuppressor().frame(width: 1, height: 1))
                 .background(MainWindowPresenterBridge().frame(width: 1, height: 1))
         }
+        .defaultSize(width: 760, height: 574)
         .commands {
             CommandGroup(replacing: .appSettings) {
                 Button(L10n.t(.preferences, lang: L10n.currentLanguage) + "…") {
@@ -80,6 +81,17 @@ private struct LaunchWindowSuppressor: NSViewRepresentable {
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusBarController: StatusBarController?
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // The main window used to open 900pt wide. Drop the saved frame once so the narrower
+        // default size applies to existing installs as well.
+        let defaults = UserDefaults.standard
+        let migrationKey = "mainWindowNarrowDefaultApplied"
+        if !defaults.bool(forKey: migrationKey) {
+            defaults.set(true, forKey: migrationKey)
+            defaults.removeObject(forKey: "NSWindow Frame main-window")
+        }
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // CopyGlass is a menu bar agent: its main window is hidden at launch and the app has to

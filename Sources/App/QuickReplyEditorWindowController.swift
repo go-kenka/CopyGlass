@@ -43,12 +43,14 @@ final class QuickReplyEditorWindowController: NSWindowController {
         window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.onCancel = { [weak self] in self?.cancel() }
-        window.contentView = NSHostingView(rootView: QuickReplyEditorView(
+        // AppContainerView injects the app language and theme; without it the SwiftUI environment
+        // falls back to English and the form's labels would not follow the app language.
+        window.contentView = NSHostingView(rootView: AppContainerView(content: QuickReplyEditorView(
             item: item,
             lang: language,
             onSave: { [weak self] saved in self?.save(saved) },
             onCancel: { [weak self] in self?.cancel() }
-        ))
+        )))
     }
 
     required init?(coder: NSCoder) {
