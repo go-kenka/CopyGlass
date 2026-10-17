@@ -763,6 +763,8 @@ struct ScreenshotRootView: View {
             }
 
             Section {
+                // Shortcuts and permissions are managed from the General section; keep this page
+                // focused on the screenshot-specific preferences.
                 NavigationLink {
                     ScreenshotPreferencesView()
                         .navigationTitle(L10n.t(.screenshotPreferences, lang: lang))
@@ -772,30 +774,6 @@ struct ScreenshotRootView: View {
                         subtitle: L10n.t(.screenshotPreferencesSubtitle, lang: lang),
                         iconSystemName: "slider.horizontal.3",
                         iconColors: [Color(red: 0.30, green: 0.72, blue: 0.95), Color(red: 0.10, green: 0.45, blue: 0.85)]
-                    )
-                }
-
-                NavigationLink {
-                    HotkeySettingsView()
-                        .navigationTitle(L10n.t(.shortcut, lang: lang))
-                } label: {
-                    SettingsNavigationRow(
-                        title: L10n.t(.shortcut, lang: lang),
-                        subtitle: L10n.t(.selectionHintRegion, lang: lang),
-                        iconSystemName: "keyboard",
-                        iconColors: [Color(red: 0.55, green: 0.38, blue: 1.0), Color(red: 0.30, green: 0.20, blue: 0.85)]
-                    )
-                }
-
-                NavigationLink {
-                    PermissionsSettingsView()
-                        .navigationTitle(L10n.t(.permissions, lang: lang))
-                } label: {
-                    SettingsNavigationRow(
-                        title: L10n.t(.screenRecording, lang: lang),
-                        subtitle: L10n.t(.screenRecordingPermissionMessage, lang: lang),
-                        iconSystemName: "record.circle",
-                        iconColors: [Color(red: 0.95, green: 0.55, blue: 0.25), Color(red: 0.95, green: 0.35, blue: 0.25)]
                     )
                 }
             }
