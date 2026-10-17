@@ -28,6 +28,27 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 echo "Copying binary..."
 cp "$BUILD_DIR/$APP_NAME" "$APP_BUNDLE/Contents/MacOS/"
 
+# 3.1 Record the real SDK version in the Mach-O metadata.
+# SwiftPM links with `-target arm64-apple-macos14.0`, so the linker records 14.0 as the SDK version
+# in LC_BUILD_VERSION instead of the SDK the app is actually compiled against. System frameworks
+# (SwiftUI included) use the recorded SDK version for "linked on or after" behaviour checks; with
+# 14.0 recorded, SwiftUI keeps its legacy window layout: the sidebar toggle is drawn next to the
+# traffic lights and the sidebar search field loses its margin to the list below it. Rewrite the
+# load command with the real SDK version while keeping macOS 14 as the minimum.
+MIN_MACOS="14.0"
+SDK_VERSION="$(xcrun --show-sdk-version 2>/dev/null || true)"
+if [ -n "$SDK_VERSION" ] && xcrun -f vtool >/dev/null 2>&1; then
+    echo "Recording SDK version $SDK_VERSION (minimum macOS $MIN_MACOS)..."
+    if xcrun vtool -set-build-version macos "$MIN_MACOS" "$SDK_VERSION" \
+        -replace -output "$APP_BUNDLE/Contents/MacOS/$APP_NAME.sdkfix" \
+        "$APP_BUNDLE/Contents/MacOS/$APP_NAME" >/dev/null 2>&1; then
+        mv "$APP_BUNDLE/Contents/MacOS/$APP_NAME.sdkfix" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
+    else
+        rm -f "$APP_BUNDLE/Contents/MacOS/$APP_NAME.sdkfix"
+        echo "warning: could not record the SDK version; the window may keep the legacy layout."
+    fi
+fi
+
 echo "Copying Info.plist..."
 cp "$SOURCES_DIR/Info.plist" "$APP_BUNDLE/Contents/"
 

@@ -4,7 +4,6 @@ import Carbon
 
 class StatusBarController: NSObject {
     private var statusItem: NSStatusItem
-    private var windowController: NSWindowController?
     private var historyPaletteController: NSWindowController?
     private var quickReplyPaletteController: NSWindowController?
     private var clipboardManager: ClipboardManager
@@ -152,41 +151,26 @@ class StatusBarController: NSObject {
     }
     
     @objc func toggleHistory() {
-        if let window = windowController?.window, window.isVisible {
-            window.orderOut(nil)
+        if let window = mainWindow, window.isVisible {
+            window.performClose(nil)
         } else {
             showHistory()
         }
     }
     
     @objc func showHistory() {
-        if windowController == nil {
-            let contentView = AppContainerView(content: SettingsView(clipboardManager: clipboardManager))
-            let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 700, height: 550),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-                backing: .buffered, defer: false)
-            
-            window.title = "CopyGlass"
-            window.center()
-            window.setFrameAutosaveName("Main Window v2")
-            window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: contentView)
-            
-            // Glass effect configuration
-            window.backgroundColor = .clear
-            window.isOpaque = false
-            window.titlebarAppearsTransparent = true
-            window.titleVisibility = .hidden
-            
-            // Enable clicking background to move window
-            window.isMovableByWindowBackground = true
-            
-            windowController = NSWindowController(window: window)
+        // The main window is owned by SwiftUI (see CopyGlassApp). Show the existing window, or ask
+        // SwiftUI to recreate it when the user has closed it.
+        if let window = mainWindow {
+            window.makeKeyAndOrderFront(nil)
+        } else {
+            MainWindowPresenter.shared.show?()
         }
-        
-        windowController?.showWindow(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.identifier?.rawValue == MainWindow.sceneID }
     }
     
     @objc func toggleHistoryPalette() {

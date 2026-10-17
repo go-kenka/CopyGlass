@@ -162,6 +162,12 @@ enum L10nKey: String, CaseIterable {
 }
 
 enum L10n {
+    /// The language saved in preferences. Used outside the SwiftUI view hierarchy (menus, AppKit).
+    static var currentLanguage: AppLanguage {
+        let raw = UserDefaults.standard.string(forKey: "appLanguage") ?? AppLanguage.zhHans.rawValue
+        return AppLanguage(rawValue: raw) ?? .zhHans
+    }
+    
     static func t(_ key: L10nKey, lang: AppLanguage) -> String {
         (lang == .zhHans ? zh : en)[key] ?? key.rawValue
     }

@@ -55,7 +55,11 @@ struct SettingsView: View {
                     .tag(section)
             }
             .listStyle(.sidebar)
-            .searchable(text: $sidebarSearchText, placement: .sidebar)
+            .searchable(
+                text: $sidebarSearchText,
+                placement: .sidebar,
+                prompt: Text(L10n.t(.search, lang: lang))
+            )
             .navigationSplitViewColumnWidth(min: 220, ideal: 240)
         } detail: {
             ZStack {
@@ -81,21 +85,30 @@ struct SettingsView: View {
 struct SettingsDetailView: View {
     @Binding var selection: AppSection
     @ObservedObject var clipboardManager: ClipboardManager
+    @Environment(\.appLanguage) private var lang
     
     var body: some View {
         NavigationStack {
-            switch selection {
-            case .general:
-                GeneralRootView()
-            case .history:
-                HistoryRootView(clipboardManager: clipboardManager)
-            case .quickReply:
-                QuickReplyRootView()
-            case .screenshot:
-                ScreenshotRootView()
-            case .about:
-                AboutRootView()
+            Group {
+                switch selection {
+                case .general:
+                    GeneralRootView()
+                case .history:
+                    HistoryRootView(clipboardManager: clipboardManager)
+                case .quickReply:
+                    QuickReplyRootView()
+                case .screenshot:
+                    ScreenshotRootView()
+                case .about:
+                    AboutRootView()
+                }
             }
+            // The window toolbar shows the navigation title of the topmost page. Pushed pages
+            // (e.g. 权限 / 剪贴板历史) set their own title, but SwiftUI leaves that title in place
+            // when popping back to a root view that has none — the toolbar then displays a page
+            // name for content that is no longer on screen. Give every root a title so the header
+            // always matches the selected section.
+            .navigationTitle(selection.title(lang))
         }
     }
 }
