@@ -56,6 +56,9 @@ class PasteboardHelper: NSObject, UNUserNotificationCenterDelegate {
     private static var notificationDelegate = NotificationDelegate()
 
     static func showCopySuccessToast() {
+        // UserNotifications needs a real application bundle; command-line test runners have none
+        // and UNUserNotificationCenter.current() raises an NSException there.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
         let center = UNUserNotificationCenter.current()
         center.delegate = notificationDelegate
 

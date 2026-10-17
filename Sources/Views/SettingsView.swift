@@ -1,10 +1,12 @@
 import SwiftUI
+import AppKit
 import Carbon
 
 enum AppSection: String, CaseIterable, Identifiable {
     case general
     case history
     case quickReply
+    case screenshot
     case about
     
     var id: String { rawValue }
@@ -14,6 +16,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return L10n.t(.general, lang: lang)
         case .history: return L10n.t(.history, lang: lang)
         case .quickReply: return L10n.t(.quickReply, lang: lang)
+        case .screenshot: return L10n.t(.screenshot, lang: lang)
         case .about: return L10n.t(.about, lang: lang)
         }
     }
@@ -23,6 +26,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return "gearshape"
         case .history: return "clock.arrow.circlepath"
         case .quickReply: return "text.bubble"
+        case .screenshot: return "camera.viewfinder"
         case .about: return "info.circle"
         }
     }
@@ -32,6 +36,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .general: return [Color(red: 0.40, green: 0.55, blue: 1.0), Color(red: 0.20, green: 0.35, blue: 0.95)]
         case .history: return [Color(red: 0.55, green: 0.38, blue: 1.0), Color(red: 0.30, green: 0.20, blue: 0.85)]
         case .quickReply: return [Color(red: 0.15, green: 0.78, blue: 0.75), Color(red: 0.05, green: 0.55, blue: 0.70)]
+        case .screenshot: return [Color(red: 0.30, green: 0.72, blue: 0.95), Color(red: 0.10, green: 0.45, blue: 0.85)]
         case .about: return [Color(red: 0.95, green: 0.55, blue: 0.25), Color(red: 0.95, green: 0.35, blue: 0.25)]
         }
     }
@@ -86,6 +91,8 @@ struct SettingsDetailView: View {
                 HistoryRootView(clipboardManager: clipboardManager)
             case .quickReply:
                 QuickReplyRootView()
+            case .screenshot:
+                ScreenshotRootView()
             case .about:
                 AboutRootView()
             }
@@ -532,6 +539,7 @@ struct HotKeyRecordingOverlay: View {
 
 struct PermissionsSettingsView: View {
     @State private var accessibilityTrusted = PasteboardHelper.accessibilityTrusted(prompt: false)
+    @State private var screenRecordingGranted = ScreenCaptureService.hasPermission
     @Environment(\.appLanguage) private var lang
     @State private var refreshToken = UUID()
     
@@ -570,6 +578,23 @@ struct PermissionsSettingsView: View {
                 }
             }
             
+            Section(L10n.t(.screenRecording, lang: lang)) {
+                LabeledContent(L10n.t(.status, lang: lang)) {
+                    LiquidGlassChip(
+                        text: screenRecordingGranted ? L10n.t(.enabled, lang: lang) : L10n.t(.disabled, lang: lang),
+                        isProminent: !screenRecordingGranted
+                    )
+                }
+                Text(L10n.t(.screenRecordingPermissionMessage, lang: lang))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(L10n.t(.openSystemSettings, lang: lang)) {
+                    _ = ScreenCaptureService.requestPermission()
+                    ScreenCaptureService.openScreenRecordingSettings()
+                    refreshAccessibilityStatus(poll: true)
+                }
+            }
+            
             Section(L10n.t(.debug, lang: lang)) {
                 LabeledContent(L10n.t(.appPath, lang: lang)) {
                     Text(Bundle.main.bundlePath)
@@ -599,6 +624,7 @@ struct PermissionsSettingsView: View {
     
     private func refreshAccessibilityStatus(poll: Bool) {
         accessibilityTrusted = PasteboardHelper.accessibilityTrusted(prompt: false)
+        screenRecordingGranted = ScreenCaptureService.hasPermission
         guard poll else { return }
         
         let token = UUID()
@@ -607,6 +633,7 @@ struct PermissionsSettingsView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(i) * 0.35) {
                 guard refreshToken == token else { return }
                 accessibilityTrusted = PasteboardHelper.accessibilityTrusted(prompt: false)
+                screenRecordingGranted = ScreenCaptureService.hasPermission
             }
         }
     }
@@ -700,6 +727,126 @@ struct AboutView: View {
             }
             
             Spacer(minLength: 0)
+        }
+    }
+}
+
+// MARK: - Screenshot settings
+
+struct ScreenshotRootView: View {
+    @Environment(\.appLanguage) private var lang
+
+    var body: some View {
+        List {
+            Section {
+                SettingsHeroCard(
+                    title: L10n.t(.screenshot, lang: lang),
+                    subtitle: L10n.t(.screenshotSubtitle, lang: lang),
+                    iconSystemName: AppSection.screenshot.systemImage,
+                    iconColors: AppSection.screenshot.iconColors
+                )
+                .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                .listRowBackground(Color.clear)
+            }
+
+            Section {
+                NavigationLink {
+                    ScreenshotPreferencesView()
+                        .navigationTitle(L10n.t(.screenshotPreferences, lang: lang))
+                } label: {
+                    SettingsNavigationRow(
+                        title: L10n.t(.screenshotPreferences, lang: lang),
+                        subtitle: L10n.t(.screenshotPreferencesSubtitle, lang: lang),
+                        iconSystemName: "slider.horizontal.3",
+                        iconColors: [Color(red: 0.30, green: 0.72, blue: 0.95), Color(red: 0.10, green: 0.45, blue: 0.85)]
+                    )
+                }
+
+                NavigationLink {
+                    HotkeySettingsView()
+                        .navigationTitle(L10n.t(.shortcut, lang: lang))
+                } label: {
+                    SettingsNavigationRow(
+                        title: L10n.t(.shortcut, lang: lang),
+                        subtitle: L10n.t(.selectionHintRegion, lang: lang),
+                        iconSystemName: "keyboard",
+                        iconColors: [Color(red: 0.55, green: 0.38, blue: 1.0), Color(red: 0.30, green: 0.20, blue: 0.85)]
+                    )
+                }
+
+                NavigationLink {
+                    PermissionsSettingsView()
+                        .navigationTitle(L10n.t(.permissions, lang: lang))
+                } label: {
+                    SettingsNavigationRow(
+                        title: L10n.t(.screenRecording, lang: lang),
+                        subtitle: L10n.t(.screenRecordingPermissionMessage, lang: lang),
+                        iconSystemName: "record.circle",
+                        iconColors: [Color(red: 0.95, green: 0.55, blue: 0.25), Color(red: 0.95, green: 0.35, blue: 0.25)]
+                    )
+                }
+            }
+        }
+        .listStyle(.inset)
+        .detailSurface()
+    }
+}
+
+struct ScreenshotPreferencesView: View {
+    @AppStorage(ScreenshotDefaults.autoCopyKey) private var autoCopy = true
+    @AppStorage(ScreenshotDefaults.showEditorKey) private var showEditor = true
+    @AppStorage(ScreenshotDefaults.formatKey) private var format = ScreenshotImageFormat.png.rawValue
+    @AppStorage(ScreenshotDefaults.jpegQualityKey) private var jpegQuality = 0.9
+    @AppStorage(ScreenshotDefaults.saveDirectoryKey) private var saveDirectory = ""
+    @Environment(\.appLanguage) private var lang
+
+    var body: some View {
+        List {
+            Section(L10n.t(.screenshotCaptureGroup, lang: lang)) {
+                Toggle(L10n.t(.screenshotAutoCopy, lang: lang), isOn: $autoCopy)
+                Toggle(L10n.t(.screenshotShowEditor, lang: lang), isOn: $showEditor)
+
+                Picker(L10n.t(.screenshotFormat, lang: lang), selection: $format) {
+                    ForEach(ScreenshotImageFormat.allCases) { item in
+                        Text(item.displayName).tag(item.rawValue)
+                    }
+                }
+
+                if format == ScreenshotImageFormat.jpeg.rawValue {
+                    LabeledContent(L10n.t(.screenshotQuality, lang: lang)) {
+                        Slider(value: $jpegQuality, in: 0.3...1.0)
+                            .frame(width: 160)
+                    }
+                }
+            }
+
+            Section(L10n.t(.screenshotSaveDirectory, lang: lang)) {
+                HStack {
+                    Text(saveDirectory.isEmpty ? L10n.t(.screenshotAskEveryTime, lang: lang) : saveDirectory)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                    Spacer(minLength: 8)
+                    Button(L10n.t(.screenshotChooseFolder, lang: lang)) { chooseDirectory() }
+                    if !saveDirectory.isEmpty {
+                        Button(L10n.t(.clear, lang: lang)) { saveDirectory = "" }
+                    }
+                }
+            }
+        }
+        .listStyle(.inset)
+        .detailSurface()
+    }
+
+    private func chooseDirectory() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = L10n.t(.screenshotChooseFolder, lang: lang)
+        if panel.runModal() == .OK, let url = panel.url {
+            saveDirectory = url.path
         }
     }
 }

@@ -62,4 +62,14 @@ cp "$ICNS_PATH" "$APP_BUNDLE/Contents/Resources/"
 # 5. Permissions
 chmod +x "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
+# 6. Ad-hoc code signature
+# macOS keys Screen Recording / Accessibility permissions to the app's code signature, so the
+# bundle id is pinned as the signing identifier. Note that an ad-hoc signature's designated
+# requirement is bound to the cdhash, so re-granting may still be required after a rebuild; a
+# stable Developer ID (or self-signed) certificate is needed to keep the grants.
+if command -v codesign >/dev/null 2>&1; then
+    echo "Signing (ad-hoc)..."
+    codesign --force --deep --sign - --identifier com.github.go-kenka.CopyGlass "$APP_BUNDLE"
+fi
+
 echo "Done! $APP_BUNDLE created successfully."

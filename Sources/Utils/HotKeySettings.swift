@@ -6,6 +6,11 @@ enum HotKeyAction: String, CaseIterable, Codable, Identifiable {
     case toggleMainWindow
     case showHistoryPalette
     case showQuickReplyPalette
+    case captureRegion
+    case captureWindow
+    case captureFullScreen
+    case captureScrolling
+    case extractText
     
     var id: String { rawValue }
     
@@ -18,6 +23,11 @@ enum HotKeyAction: String, CaseIterable, Codable, Identifiable {
         case .toggleMainWindow: return .showMainWindow
         case .showHistoryPalette: return .historyList
         case .showQuickReplyPalette: return .quickReplyList
+        case .captureRegion: return .captureRegion
+        case .captureWindow: return .captureWindow
+        case .captureFullScreen: return .captureFullScreen
+        case .captureScrolling: return .captureScrolling
+        case .extractText: return .extractText
         }
     }
     
@@ -29,6 +39,16 @@ enum HotKeyAction: String, CaseIterable, Codable, Identifiable {
             return HotKeyBinding(keyCode: UInt32(kVK_ANSI_O), modifiers: UInt32(cmdKey))
         case .showQuickReplyPalette:
             return HotKeyBinding(keyCode: UInt32(kVK_ANSI_P), modifiers: UInt32(cmdKey))
+        case .captureRegion:
+            return HotKeyBinding(keyCode: UInt32(kVK_ANSI_A), modifiers: UInt32(cmdKey | shiftKey))
+        case .captureWindow:
+            return HotKeyBinding(keyCode: UInt32(kVK_ANSI_W), modifiers: UInt32(cmdKey | shiftKey))
+        case .captureFullScreen:
+            return HotKeyBinding(keyCode: UInt32(kVK_ANSI_F), modifiers: UInt32(cmdKey | shiftKey))
+        case .captureScrolling:
+            return HotKeyBinding(keyCode: UInt32(kVK_ANSI_X), modifiers: UInt32(cmdKey | shiftKey))
+        case .extractText:
+            return HotKeyBinding(keyCode: UInt32(kVK_ANSI_T), modifiers: UInt32(cmdKey | shiftKey))
         }
     }
     
@@ -37,6 +57,11 @@ enum HotKeyAction: String, CaseIterable, Codable, Identifiable {
         case .toggleMainWindow: return 1
         case .showHistoryPalette: return 2
         case .showQuickReplyPalette: return 3
+        case .captureRegion: return 4
+        case .captureWindow: return 5
+        case .captureFullScreen: return 6
+        case .captureScrolling: return 7
+        case .extractText: return 8
         }
     }
 }

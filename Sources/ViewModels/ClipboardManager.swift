@@ -4,6 +4,10 @@ import AppKit
 class ClipboardManager: ObservableObject {
     static let maxStoredImageBytes = 5 * 1024 * 1024
 
+    /// Single shared instance. The pasteboard poller must never run twice, and both the main window
+    /// and the standard Settings scene (Cmd+,) observe the same history.
+    static let shared = ClipboardManager()
+
     @Published var history: [ClipboardItemSummary] = []
     private var lastChangeCount: Int
     private var lastItem: ClipboardItem?

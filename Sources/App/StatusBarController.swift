@@ -14,8 +14,9 @@ class StatusBarController: NSObject {
     private let quickReplyPaletteModel = QuickReplyPaletteModel()
     
     override init() {
+        ScreenshotDefaults.register()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        clipboardManager = ClipboardManager()
+        clipboardManager = ClipboardManager.shared
         super.init()
         
         clipboardManager.startMonitoring()
@@ -34,11 +35,46 @@ class StatusBarController: NSObject {
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: L10n.t(.showMainWindow, lang: lang), action: #selector(showHistory), keyEquivalent: "h"))
         menu.addItem(NSMenuItem.separator())
+
+        let screenshotItem = NSMenuItem(title: L10n.t(.screenshot, lang: lang), action: nil, keyEquivalent: "")
+        let screenshotMenu = NSMenu()
+        let screenshotEntries: [(String, Selector)] = [
+            (L10n.t(.captureRegion, lang: lang), #selector(captureRegion)),
+            (L10n.t(.captureWindow, lang: lang), #selector(captureWindow)),
+            (L10n.t(.captureFullScreen, lang: lang), #selector(captureFullScreen)),
+            (L10n.t(.captureScrolling, lang: lang), #selector(captureScrolling)),
+            (L10n.t(.extractText, lang: lang), #selector(extractText))
+        ]
+        for (title, selector) in screenshotEntries {
+            screenshotMenu.addItem(NSMenuItem(title: title, action: selector, keyEquivalent: ""))
+        }
+        screenshotMenu.addItem(NSMenuItem.separator())
+        screenshotMenu.addItem(NSMenuItem(title: L10n.t(.pinUnpinAll, lang: lang), action: #selector(unpinAll), keyEquivalent: ""))
+        screenshotItem.submenu = screenshotMenu
+        menu.addItem(screenshotItem)
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: L10n.t(.quit, lang: lang), action: #selector(quit), keyEquivalent: "q"))
         statusItem.menu = menu
-        
-        menu.items.forEach { $0.target = self }
+
+        applyTargets(to: menu)
     }
+
+    private func applyTargets(to menu: NSMenu) {
+        for item in menu.items {
+            if let submenu = item.submenu {
+                applyTargets(to: submenu)
+            } else if item.action != nil {
+                item.target = self
+            }
+        }
+    }
+
+    @objc func captureRegion() { ScreenshotController.shared.captureRegion() }
+    @objc func captureWindow() { ScreenshotController.shared.captureWindow() }
+    @objc func captureFullScreen() { ScreenshotController.shared.captureFullScreen() }
+    @objc func captureScrolling() { ScreenshotController.shared.captureScrolling() }
+    @objc func extractText() { ScreenshotController.shared.extractText() }
+    @objc func unpinAll() { PinWindowManager.shared.unpinAll() }
 
     @objc private func reloadMenu() {
         setupMenu()
@@ -85,6 +121,33 @@ class StatusBarController: NSObject {
             modifiers: quickReplyPalette.modifiers
         ) { [weak self] in
             DispatchQueue.main.async { self?.toggleQuickReplyPalette() }
+        }
+
+        registerScreenshotHotKey(.captureRegion) {
+            ScreenshotController.shared.captureRegion()
+        }
+        registerScreenshotHotKey(.captureWindow) {
+            ScreenshotController.shared.captureWindow()
+        }
+        registerScreenshotHotKey(.captureFullScreen) {
+            ScreenshotController.shared.captureFullScreen()
+        }
+        registerScreenshotHotKey(.captureScrolling) {
+            ScreenshotController.shared.captureScrolling()
+        }
+        registerScreenshotHotKey(.extractText) {
+            ScreenshotController.shared.extractText()
+        }
+    }
+
+    private func registerScreenshotHotKey(_ action: HotKeyAction, handler: @escaping () -> Void) {
+        let binding = hotKeySettings.binding(for: action)
+        HotKeyManager.shared.registerHotKey(
+            id: action.registrationID,
+            keyCode: binding.keyCode,
+            modifiers: binding.modifiers
+        ) {
+            DispatchQueue.main.async { handler() }
         }
     }
     
