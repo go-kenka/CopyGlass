@@ -133,3 +133,18 @@ struct AnnotationShape: Identifiable, Equatable {
         AnnotationShape(tool: .rectangle, points: [start, end], color: color, lineWidth: lineWidth)
     }
 }
+
+extension AnnotationTool {
+    /// Single-letter shortcuts shared by the in-place capture editor and the long-image editor.
+    static let keyboardShortcuts: [String: AnnotationTool] = [
+        "v": .select,
+        "r": .rectangle,
+        "e": .ellipse,
+        "a": .arrow,
+        "p": .pen,
+        "h": .highlighter,
+        "t": .text,
+        "m": .mosaic,
+        "n": .number
+    ]
+}

@@ -75,6 +75,35 @@ enum ImageUtils {
         return context.makeImage()
     }
 
+    /// Most common colour of the image (quantised), used as the background of the areas that
+    /// extend beyond the captured screenful.
+    static func dominantColor(of image: CGImage, sampleSize: Int = 24) -> CGColor {
+        guard let context = makeContext(width: sampleSize, height: sampleSize) else {
+            return NSColor.white.cgColor
+        }
+        context.interpolationQuality = .low
+        context.draw(image, in: CGRect(x: 0, y: 0, width: sampleSize, height: sampleSize))
+        guard let raw = context.data else { return NSColor.white.cgColor }
+        let buffer = raw.bindMemory(to: UInt8.self, capacity: sampleSize * sampleSize * 4)
+        var counts: [UInt32: Int] = [:]
+        for index in 0..<(sampleSize * sampleSize) {
+            let offset = index * 4
+            let red = UInt32(buffer[offset + 2] / 16)
+            let green = UInt32(buffer[offset + 1] / 16)
+            let blue = UInt32(buffer[offset] / 16)
+            counts[(red << 8) | (green << 4) | blue, default: 0] += 1
+        }
+        guard let best = counts.max(by: { $0.value < $1.value })?.key else {
+            return NSColor.white.cgColor
+        }
+        return NSColor(
+            srgbRed: CGFloat((best >> 8) & 0xF) / 15,
+            green: CGFloat((best >> 4) & 0xF) / 15,
+            blue: CGFloat(best & 0xF) / 15,
+            alpha: 1
+        ).cgColor
+    }
+
     static func encode(_ image: CGImage, format: ScreenshotImageFormat, quality: Double = 0.9) -> Data? {
         let rep = NSBitmapImageRep(cgImage: image)
         rep.size = NSSize(width: image.width, height: image.height)

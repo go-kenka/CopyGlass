@@ -10,55 +10,69 @@ final class ScreenshotController {
     private init() {}
 
     func captureRegion() {
-        guard ensurePermission() else { return }
+        guard ensurePermission(), !ScrollingCaptureController.shared.isRunning else { return }
         RegionSelectionController.shared.begin(
             mode: .region,
             purpose: .edit,
-            onError: { [weak self] error in self?.presentError(error) }
+            onError: { [weak self] error in self?.presentError(error) },
+            onScrollingCapture: { [weak self] region in self?.startScrolling(region: region) }
         )
     }
 
     func captureWindow() {
-        guard ensurePermission() else { return }
+        guard ensurePermission(), !ScrollingCaptureController.shared.isRunning else { return }
         RegionSelectionController.shared.begin(
             mode: .window,
             purpose: .edit,
-            onError: { [weak self] error in self?.presentError(error) }
+            onError: { [weak self] error in self?.presentError(error) },
+            onScrollingCapture: { [weak self] region in self?.startScrolling(region: region) }
         )
     }
 
     func captureFullScreen() {
-        guard ensurePermission() else { return }
+        guard ensurePermission(), !ScrollingCaptureController.shared.isRunning else { return }
         let point = NSEvent.mouseLocation
         guard let screen = ScreenGeometry.screen(containing: point) ?? NSScreen.main else { return }
         RegionSelectionController.shared.begin(
             mode: .region,
             purpose: .edit,
             preselect: screen.frame,
-            onError: { [weak self] error in self?.presentError(error) }
+            onError: { [weak self] error in self?.presentError(error) },
+            onScrollingCapture: { [weak self] region in self?.startScrolling(region: region) }
         )
     }
 
     func captureScrolling() {
-        guard ensurePermission() else { return }
+        guard ensurePermission(), !ScrollingCaptureController.shared.isRunning else { return }
         RegionSelectionController.shared.begin(
             mode: .region,
             purpose: .scroll,
             onError: { [weak self] error in self?.presentError(error) },
-            completion: { result in
-                guard let result else { return }
-                ScrollingCaptureController.shared.start(region: result.cocoaRect) { image in
-                    guard let image else { return }
-                    // A stitched long image is not the frozen screen, so it opens in the editor
-                    // window (annotate, extract text, copy, save or pin it).
-                    ScreenshotEditorManager.shared.present(image: image)
-                }
-            }
+            onScrollingCapture: { [weak self] region in self?.startScrolling(region: region) }
         )
     }
 
+    /// Runs the manual scrolling capture for a confirmed region.
+    ///
+    /// A stitched long image is not the frozen screen, so it opens in the editor window: the user can
+    /// annotate, extract text, copy, save or pin it, but it can no longer be re-captured or resized.
+    func startScrolling(region: CGRect) {
+        ScrollingCaptureController.shared.start(region: region) { [weak self] image in
+            guard let image else { return }
+            // Reuse the ordinary capture editor: the stitched image takes the place of the capture
+            // frame and is edited in place with the same overlay, toolbar and shortcuts.
+            RegionSelectionController.shared.begin(
+                mode: .region,
+                purpose: .edit,
+                longImage: image,
+                screenHint: ScreenGeometry.screen(bestMatching: region),
+                onError: { [weak self] error in self?.presentError(error) }
+            )
+        }
+    }
+
     func extractText() {
-        guard ensurePermission() else { return }
+        guard ensurePermission(), !ScrollingCaptureController.shared.isRunning else { return }
         RegionSelectionController.shared.begin(
             mode: .region,
             purpose: .extractText,

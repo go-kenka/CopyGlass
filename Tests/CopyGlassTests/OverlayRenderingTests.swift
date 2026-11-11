@@ -182,6 +182,7 @@ final class OverlayRenderingTests: XCTestCase {
             onPin: {},
             onExtractText: {},
             onCopyText: { _ in },
+            onScrollingCapture: {},
             onCancel: {}
         ))
         host.frame = CGRect(x: 0, y: 0, width: 900, height: 200)

@@ -53,11 +53,11 @@ swift build --disable-sandbox
 5. **截图模块**（`Sources/Screenshot/`）
    - `ScreenshotController`：菜单栏 / 快捷键统一入口，负责权限检查与结果分发
    - `ScreenCaptureService`：ScreenCaptureKit 封装，提供全屏、区域、窗口（原生分辨率）采集
-   - `RegionSelectionController`：冻结全屏的选区遮罩（十字线、放大镜、像素取色、键盘微调、单击选窗口）
-   - `ScrollingCaptureController` + `ImageStitcher`：自动滚动截图，按行特征匹配重叠区域并拼接长图
+   - `RegionSelectionController`：冻结全屏的选区遮罩（十字线、放大镜、像素取色、键盘微调、单击选窗口）；滚动截图完成后也在这里直接用同一套编辑界面标注长图（画面固定、不可重新截图）
+   - `ScrollingCaptureController` + `ScrollStitchSession` + `ImageStitcher`：手动滚动截图，用户在选区上方自己滚动；按「行 × 列」格子区分固定区域与滚动区域，用移动区域的位移（多段共识 + 运动连续性）对齐并增量拼接长图（固定侧边栏/吸顶页头/底部输入框只出现一次、重复列表不会串行），右侧 `ScrollingPreviewController` 实时预览生成中的长图（完成后进入编辑器，不可重新截图/调整区域）
    - `OCRService`：Vision `VNRecognizeTextRequest`（zh-Hans / zh-Hant / en）文字识别与行分组
-   - `AnnotationRenderer` + `AnnotationCanvasView`：标注模型与绘制（屏幕预览和导出复用同一套 CoreGraphics 绘制代码）
-   - `ScreenshotEditorWindowController`：截图编辑器窗口
+   - `AnnotationRenderer`：标注模型与绘制（屏幕预览和导出复用同一套 CoreGraphics 绘制代码）
+   - `LongImageEditorLayout`：滚动截图的长图在冻结遮罩编辑里的等比摆放（给浮动工具栏留空间）
    - `PinWindowController`：固定到屏幕的置顶浮窗（拖动、缩放、透明度、右键菜单）
 
 ### 数据流

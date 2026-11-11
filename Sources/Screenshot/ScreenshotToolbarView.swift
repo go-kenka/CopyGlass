@@ -15,6 +15,9 @@ struct ScreenshotToolbarContainer: View {
     let onExtractText: () -> Void
     /// Copies recognized text and then finishes the capture (the overlay closes).
     let onCopyText: (String) -> Void
+    /// Switches the frozen capture into the manual scrolling capture for the same region. Absent
+    /// when the flow has no live screen behind it to scroll (text extraction).
+    let onScrollingCapture: (() -> Void)?
     let onCancel: () -> Void
 
     private var lang: AppLanguage { language }
@@ -103,6 +106,9 @@ struct ScreenshotToolbarContainer: View {
 
             separator
 
+            if let onScrollingCapture {
+                iconButton("scroll", help: L10n.t(.captureScrolling, lang: lang)) { onScrollingCapture() }
+            }
             iconButton("text.viewfinder", help: L10n.t(.ocrTitle, lang: lang)) { onExtractText() }
             iconButton("pin", help: L10n.t(.pin, lang: lang)) { onPin() }
             iconButton("square.and.arrow.down", help: L10n.t(.save, lang: lang)) { onSave() }

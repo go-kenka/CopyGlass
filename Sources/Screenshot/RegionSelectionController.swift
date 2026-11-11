@@ -58,11 +58,17 @@ final class RegionSelectionController {
     private var images: [CGDirectDisplayID: CGImage] = [:]
     private var candidates: [CapturableWindow] = []
     private var completion: ((SelectionResult?) -> Void)?
+    private var onScrollingCapture: ((CGRect) -> Void)?
     private var keyMonitor: Any?
     private var dragOrigin: CGPoint?
     private var dragMoved = false
     private var previousApp: NSRunningApplication?
     private var preselectRect: CGRect?
+    /// Long image produced by a scrolling capture, edited in place instead of selecting a region.
+    private var pendingLongImage: CGImage?
+    private var longImageScreen: NSScreen?
+    /// The capture frame is fixed for long images: there is no frozen screen to re-crop from.
+    private(set) var allowsFrameAdjustment = true
     private var toolbarHost: NSView?
     private var sessionObserver: AnyCancellable?
     private var activationWorkItem: DispatchWorkItem?
@@ -114,12 +120,20 @@ final class RegionSelectionController {
 
     /// - Parameter preselect: skips the selection phase for this Cocoa-global rectangle (used by
     ///   full screen capture).
+    /// - Parameter onScrollingCapture: starts the manual scrolling capture for a confirmed region.
+    ///   Used by the toolbar button and by the dedicated "scrolling capture" command.
+    /// - Parameter longImage: skips the selection phase and edits this stitched image in place with
+    ///   the ordinary capture editor (same overlay, toolbar, shortcuts and actions).
+    /// - Parameter screenHint: display the long image should be centred on.
     func begin(
         mode: Mode = .region,
         purpose: Purpose = .edit,
         preselect: CGRect? = nil,
+        longImage: CGImage? = nil,
+        screenHint: NSScreen? = nil,
         onError: @escaping (Error) -> Void,
-        completion: ((SelectionResult?) -> Void)? = nil
+        completion: ((SelectionResult?) -> Void)? = nil,
+        onScrollingCapture: ((CGRect) -> Void)? = nil
     ) {
         guard !isActive else { return }
         // A previous teardown may still be waiting for the other app to regain focus; it must not
@@ -132,7 +146,11 @@ final class RegionSelectionController {
         self.mode = mode
         self.purpose = purpose
         self.preselectRect = preselect
+        self.pendingLongImage = longImage
+        self.longImageScreen = screenHint
+        self.allowsFrameAdjustment = longImage == nil
         self.completion = completion
+        self.onScrollingCapture = onScrollingCapture
         phase = .selecting
         session = nil
         selection = .zero
@@ -230,6 +248,14 @@ final class RegionSelectionController {
         // bar and resigns the previous app's key window, and doing that any earlier leaves those
         // changes visible for a frame or two over the live desktop — the flash when a capture opens.
         scheduleOverlayActivation()
+
+        // A scrolling capture hands its stitched image over here: enter the ordinary editing phase
+        // directly, with the image fitted where a capture frame would be, and no frame adjustment.
+        if let longImage = pendingLongImage {
+            pendingLongImage = nil
+            enterLongImageEditing(image: longImage)
+            return
+        }
 
         if let preselectRect {
             self.preselectRect = nil
@@ -453,8 +479,14 @@ final class RegionSelectionController {
         selection = result.cocoaRect
         switch purpose {
         case .scroll:
-            let handler = completion
-            teardown(completion: { handler?(result) })
+            // Dedicated scrolling-capture command: go straight to the manual scrolling session
+            // instead of showing the annotation toolbar first.
+            let region = result.cocoaRect
+            guard let handler = onScrollingCapture else {
+                teardown()
+                return
+            }
+            teardown(completion: { handler(region) })
         case .extractText:
             enterEditing()
         case .edit:
@@ -492,6 +524,23 @@ final class RegionSelectionController {
             completion?(nil)
             return
         }
+        beginEditing(with: crop)
+    }
+
+    /// Enters the editing phase for a stitched long image, placed where a capture frame would be.
+    private func enterLongImageEditing(image: CGImage) {
+        let screen = longImageScreen ?? NSScreen.main
+        longImageScreen = nil
+        let visible = screen?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1280, height: 800)
+        selection = LongImageEditorLayout.fittedSelection(
+            imagePixelSize: CGSize(width: image.width, height: image.height),
+            visibleFrame: visible,
+            backingScale: screen?.backingScaleFactor ?? 2
+        )
+        beginEditing(with: image)
+    }
+
+    private func beginEditing(with crop: CGImage) {
         let session = CaptureSession(image: crop)
         session.onNeedsDisplay = { [weak self] in
             self?.refresh()
@@ -523,7 +572,7 @@ final class RegionSelectionController {
     /// Starts moving (when `handle` is nil) or resizing the capture frame while annotating. The
     /// frozen displays are still around, so the crop is simply rebuilt for the new frame.
     func beginSelectionAdjustment(handle: SelectionHandle?, at point: CGPoint) {
-        guard phase == .editing, session != nil else { return }
+        guard phase == .editing, session != nil, allowsFrameAdjustment else { return }
         commitInlineTextEditors()
         frameDrag = FrameDrag(startSelection: selection.standardized, startPoint: point, handle: handle)
     }
@@ -726,8 +775,42 @@ final class RegionSelectionController {
             onPin: { [weak self] in self?.performPin() },
             onExtractText: { [weak self] in self?.performExtractText() },
             onCopyText: { [weak self] text in self?.performCopyText(text) },
+            onScrollingCapture: onScrollingCapture == nil
+                ? nil
+                : { [weak self] in self?.performScrollingCapture() },
             onCancel: { [weak self] in self?.cancelEditing() }
         )
+    }
+
+    /// Switches from the frozen capture to the manual scrolling session for the current selection.
+    ///
+    /// The frozen overlay has to go away first: the user scrolls the live application underneath,
+    /// and the long image is assembled from fresh captures of that live region. The result opens in
+    /// the editor window, where it can be annotated but not re-captured or resized.
+    private func performScrollingCapture() {
+        guard phase == .editing, isActive, let handler = onScrollingCapture else { return }
+        if session?.hasAnnotations == true, !confirmDiscardAnnotations() {
+            return
+        }
+        let region = selection.standardized.integral
+        guard region.width >= 40, region.height >= 40 else {
+            NSSound.beep()
+            return
+        }
+        teardown(restorePreviousApp: true, completion: { handler(region) })
+    }
+
+    /// The frozen overlay sits above the alert level, so the confirmation has to be raised as well.
+    private func confirmDiscardAnnotations() -> Bool {
+        let lang = AppLanguage.current
+        let alert = NSAlert()
+        alert.messageText = L10n.t(.scrollingCaptureDiscardAnnotationsTitle, lang: lang)
+        alert.informativeText = L10n.t(.scrollingCaptureDiscardAnnotationsMessage, lang: lang)
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L10n.t(.scrollingCaptureContinue, lang: lang))
+        alert.addButton(withTitle: L10n.t(.cancel, lang: lang))
+        alert.window.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue + 1)
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     private func removeToolbar() {
@@ -788,7 +871,7 @@ final class RegionSelectionController {
                 return true
             }
             if flags.isEmpty, let characters = event.charactersIgnoringModifiers?.lowercased() {
-                if let tool = Self.toolShortcuts[characters] {
+                if let tool = AnnotationTool.keyboardShortcuts[characters] {
                     session?.tool = tool
                     return true
                 }
@@ -822,18 +905,6 @@ final class RegionSelectionController {
         }
     }
 
-    private static let toolShortcuts: [String: AnnotationTool] = [
-        "v": .select,
-        "r": .rectangle,
-        "e": .ellipse,
-        "a": .arrow,
-        "p": .pen,
-        "h": .highlighter,
-        "t": .text,
-        "m": .mosaic,
-        "n": .number
-    ]
-
     private func confirmHoveredOrSelection() {
         if dragMoved || selection.width >= 4 || selection.height >= 4 {
             let rect = selection.standardized.integral
@@ -865,7 +936,11 @@ final class RegionSelectionController {
         session = nil
         images.removeAll()
         candidates.removeAll()
+        pendingLongImage = nil
+        longImageScreen = nil
+        allowsFrameAdjustment = true
         completion = nil
+        onScrollingCapture = nil
         preselectRect = nil
         hoveredWindow = nil
         dragOrigin = nil

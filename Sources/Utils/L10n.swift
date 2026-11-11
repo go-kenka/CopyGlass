@@ -92,7 +92,6 @@ enum L10nKey: String, CaseIterable {
     // MARK: Screenshot
     case screenshot
     case screenshotSubtitle
-    case screenshotEditor
     case screenshotPreferences
     case screenshotPreferencesSubtitle
     case screenshotAutoCopy
@@ -121,10 +120,13 @@ enum L10nKey: String, CaseIterable {
     case ocrFailed
     case noTextFound
 
-    case scrollingCaptureTitle
-    case scrollingCaptureHint
-    case scrollingCaptureStop
+    case scrollingCaptureDone
     case scrollingCaptureProgress
+    case scrollingCaptureSlowDown
+    case scrollingCaptureMaxLength
+    case scrollingCaptureDiscardAnnotationsTitle
+    case scrollingCaptureDiscardAnnotationsMessage
+    case scrollingCaptureContinue
 
     case ocrTitle
     case ocrRecognizing
@@ -266,7 +268,6 @@ enum L10n {
 
         .screenshot: "Screenshot",
         .screenshotSubtitle: "Capture, annotate, recognize text and pin to screen.",
-        .screenshotEditor: "Screenshot",
         .screenshotPreferences: "Screenshot Preferences",
         .screenshotPreferencesSubtitle: "Save location and capture behaviour",
         .screenshotAutoCopy: "Copy to clipboard when finishing (Enter)",
@@ -295,10 +296,13 @@ enum L10n {
         .ocrFailed: "Text recognition failed. Please try again.",
         .noTextFound: "No text found",
 
-        .scrollingCaptureTitle: "Scrolling Capture",
-        .scrollingCaptureHint: "Scrolls automatically — press Stop to finish.",
-        .scrollingCaptureStop: "Stop",
-        .scrollingCaptureProgress: "Captured {count} frames · {height} px tall",
+        .scrollingCaptureDone: "Done",
+        .scrollingCaptureProgress: "Stitched {count} frames · {height} px tall",
+        .scrollingCaptureSlowDown: "Scrolled too fast — scroll back a little to continue.",
+        .scrollingCaptureMaxLength: "Maximum length reached — press Done to finish.",
+        .scrollingCaptureDiscardAnnotationsTitle: "Scrolling capture discards annotations",
+        .scrollingCaptureDiscardAnnotationsMessage: "Continue to close the current annotations and start the scrolling capture.",
+        .scrollingCaptureContinue: "Continue",
 
         .ocrTitle: "Text Recognition",
         .ocrRecognizing: "Recognizing…",
@@ -429,7 +433,6 @@ enum L10n {
 
         .screenshot: "截图",
         .screenshotSubtitle: "截图、标注、文字识别与固定到屏幕。",
-        .screenshotEditor: "截图",
         .screenshotPreferences: "截图设置",
         .screenshotPreferencesSubtitle: "保存位置与截图行为",
         .screenshotAutoCopy: "完成截图时复制到剪贴板（回车）",
@@ -458,10 +461,13 @@ enum L10n {
         .ocrFailed: "文字识别失败，请重试。",
         .noTextFound: "未识别到文字",
 
-        .scrollingCaptureTitle: "滚动截图",
-        .scrollingCaptureHint: "正在自动滚动，点击停止结束。",
-        .scrollingCaptureStop: "停止",
-        .scrollingCaptureProgress: "已捕获 {count} 帧 · 高度 {height} px",
+        .scrollingCaptureDone: "完成",
+        .scrollingCaptureProgress: "已拼接 {count} 帧 · 高度 {height} px",
+        .scrollingCaptureSlowDown: "滚动太快，往回滚一点再继续。",
+        .scrollingCaptureMaxLength: "已达最大长度，点击完成结束。",
+        .scrollingCaptureDiscardAnnotationsTitle: "滚动截图会丢弃当前标注",
+        .scrollingCaptureDiscardAnnotationsMessage: "继续将关闭当前标注并开始滚动截图。",
+        .scrollingCaptureContinue: "继续",
 
         .ocrTitle: "文字识别",
         .ocrRecognizing: "识别中…",

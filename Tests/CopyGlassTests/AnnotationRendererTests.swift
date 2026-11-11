@@ -118,32 +118,34 @@ final class AnnotationRendererTests: XCTestCase {
         XCTAssertGreaterThan(value.r, 200)
     }
 
-    func testEditorModelUndoRedoAndClear() throws {
+    func testEditorSessionUndoRedoAndClear() throws {
+        // The long-image editor shares CaptureSession with the in-place capture editor, so the undo
+        // and flatten behaviour is the same one that path uses.
         let base = TestImage.solid(white, width: 100, height: 100)
-        let model = ScreenshotEditorModel(image: base)
-        XCTAssertFalse(model.canUndo)
-        XCTAssertFalse(model.hasAnnotations)
+        let session = CaptureSession(image: base)
+        XCTAssertFalse(session.canUndo)
+        XCTAssertFalse(session.hasAnnotations)
 
         let first = AnnotationShape.rectangle(from: CGPoint(x: 10, y: 10), to: CGPoint(x: 40, y: 40), color: red, lineWidth: 4)
         let second = AnnotationShape.rectangle(from: CGPoint(x: 50, y: 50), to: CGPoint(x: 80, y: 80), color: red, lineWidth: 4)
-        model.commit(first)
-        model.commit(second)
-        XCTAssertEqual(model.shapes.count, 2)
-        XCTAssertTrue(model.canUndo)
-        XCTAssertEqual(model.nextNumberLabel(), 1)
+        session.commit(first)
+        session.commit(second)
+        XCTAssertEqual(session.shapes.count, 2)
+        XCTAssertTrue(session.canUndo)
+        XCTAssertEqual(session.nextBadge, 1)
 
-        model.undo()
-        XCTAssertEqual(model.shapes.count, 1)
-        XCTAssertTrue(model.canRedo)
-        model.redo()
-        XCTAssertEqual(model.shapes.count, 2)
+        session.undo()
+        XCTAssertEqual(session.shapes.count, 1)
+        XCTAssertTrue(session.canRedo)
+        session.redo()
+        XCTAssertEqual(session.shapes.count, 2)
 
-        model.clearAnnotations()
-        XCTAssertTrue(model.shapes.isEmpty)
-        model.undo()
-        XCTAssertEqual(model.shapes.count, 2)
+        session.clearAnnotations()
+        XCTAssertTrue(session.shapes.isEmpty)
+        session.undo()
+        XCTAssertEqual(session.shapes.count, 2)
 
-        let flattened = model.flattenedImage()
+        let flattened = session.flattenedImage()
         XCTAssertEqual(flattened.width, 100)
         let stroke = TestImage.pixel(flattened, x: 10, y: 25)
         XCTAssertTrue(

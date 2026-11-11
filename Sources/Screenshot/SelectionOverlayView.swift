@@ -172,7 +172,9 @@ final class SelectionOverlayView: NSView {
     /// annotations because they sit on the border.
     private func beginEditingInteraction(at globalPoint: CGPoint, in event: NSEvent) {
         let viewPoint = convert(globalPoint)
-        if let handle = SelectionAdjustment.handle(at: viewPoint, in: unclampedSelectionInView) {
+        // The frame of a stitched long image cannot be re-cropped, so its handles are inert.
+        if controller?.allowsFrameAdjustment == true,
+           let handle = SelectionAdjustment.handle(at: viewPoint, in: unclampedSelectionInView) {
             commitTextEditorIfNeeded()
             controller?.beginSelectionAdjustment(handle: handle, at: globalPoint)
             gesture = .selectionResize(handle: handle)
@@ -219,7 +221,8 @@ final class SelectionOverlayView: NSView {
         case .none:
             session.select(nil)
             // Dragging the bare capture with the pointer tool moves the whole frame.
-            if session.tool == .select, selectionInView.contains(viewPoint) {
+            if session.tool == .select, selectionInView.contains(viewPoint),
+               controller?.allowsFrameAdjustment == true {
                 controller?.beginSelectionAdjustment(handle: nil, at: globalPoint)
                 gesture = .selectionMove
             } else {
@@ -357,7 +360,8 @@ final class SelectionOverlayView: NSView {
         guard gesture == .none, session.textEditingShapeID == nil else { return }
         let viewPoint = convert(globalPoint)
         // The capture frame handles sit on the border, above the annotations.
-        if let handle = SelectionAdjustment.handle(at: viewPoint, in: unclampedSelectionInView) {
+        if controller?.allowsFrameAdjustment == true,
+           let handle = SelectionAdjustment.handle(at: viewPoint, in: unclampedSelectionInView) {
             session.setHoveredShape(nil)
             handle.cursor.set()
             return
@@ -374,7 +378,8 @@ final class SelectionOverlayView: NSView {
             NSCursor.crosshair.set()
         } else if hit != nil {
             NSCursor.openHand.set()
-        } else if session.tool == .select, selectionInView.contains(viewPoint) {
+        } else if session.tool == .select, selectionInView.contains(viewPoint),
+                  controller?.allowsFrameAdjustment == true {
             // Hints that the frame itself can be dragged with the pointer tool.
             NSCursor.openHand.set()
         } else {
@@ -565,8 +570,11 @@ final class SelectionOverlayView: NSView {
         context.strokePath()
         context.restoreGState()
 
-        // Frame handles: the capture area can still be resized while the annotations are edited.
-        drawFrameHandles(in: frameInView, context: context)
+        // Frame handles: the capture area can still be resized while the annotations are edited,
+        // except for a stitched long image which has no frozen screen to re-crop.
+        if controller.allowsFrameAdjustment {
+            drawFrameHandles(in: frameInView, context: context)
+        }
     }
 
     private func drawFrameHandles(in rect: CGRect, context: CGContext) {

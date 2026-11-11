@@ -90,7 +90,7 @@ CopyGlass 是一款面向 macOS 的剪切板管理工具，采用 Swift、SwiftU
 
 快捷键：`Esc` 取消、`回车` 复制并关闭、`⌘C` 复制、`⌘S` 保存、`⌘Z` / `⌘⇧Z` 撤销 / 重做，工具键 `V` 选择、`R` 矩形、`E` 椭圆、`A` 箭头、`P` 画笔、`H` 荧光笔、`T` 文字、`M` 马赛克、`N` 序号。
 
-**滚动截图**：框选区域后自动向下滚动并拼接成长图，悬浮面板可随时停止；到达页面底部（画面不再变化）时会自动结束，也可以在检测不到位移时自动反向重试一次。拼接结果会打开编辑器窗口，便于继续标注、取字、复制或保存。
+**滚动截图**：在截图工具栏点滚动按钮（或直接用滚动截图命令框选区域）后，遮罩关闭、原应用恢复前台，用触控板/滚轮**自己滚动页面**即可，应用会边滚边把选区内容拼接成长图（按「行 × 列」格子识别固定区域：侧边栏、吸顶页头、底部输入框/状态栏这类固定块只保留一次，只有滚动区域延伸；重复的列表行靠移动区域位移 + 多段共识和运动连续性对齐，不会重复拼接）；**右侧浮动面板会实时显示正在拼接的长图**（跟着新内容增长，滚出面板高度后显示最新一段并带滚动指示），悬浮面板显示已拼接帧数与高度，点「完成」结束（也可按回车），点「取消」或 Esc 放弃。滚得太快导致两帧对不上时会提示慢一点，往回滚即可继续；点「完成」后**直接在截图遮罩里进入和普通截图完全相同的标注编辑**（同一套浮动工具栏、标注工具、撤销/重做、取字、固定、保存、复制、取消），长图按屏幕大小等比放置在原来选区的位置上；区别是长图不能再重新截图或拖动调整区域。
 
 **提取文字（⌘⇧T）**：框选后直接进入标注界面并开始识别，识别结果面板可以整段或按行复制；复制后截图遮罩直接关闭并恢复前台应用。
 
@@ -235,15 +235,13 @@ Sources/Screenshot/
   SelectionOverlayView.swift           覆盖层视图：十字线 / 放大镜 / 窗口高亮 + 原地标注绘制与鼠标交互
   CaptureSession.swift                 单次截图的可观察编辑状态（图形、撤销重做、OCR、导出）
   ScreenshotToolbarView.swift          选区下方的浮动工具栏与文字识别面板
-  ImageStitcher.swift                  基于行特征的重叠匹配与长图拼接算法
-  ScrollingCaptureController.swift     自动滚动截图 + 悬浮控制面板
+  ImageStitcher.swift                  基于行特征的重叠匹配与位移估计
+  ScrollStitchSession.swift            手动滚动截图的增量拼接（文档绝对坐标，双向扩展不重复）
+  ScrollingCaptureController.swift     手动滚动截图会话 + 悬浮控制面板 + 取景框
   OCRService.swift                     Vision 文字识别与行分组
   AnnotationModels.swift               标注工具与图形模型
   AnnotationRenderer.swift             标注绘制（覆盖层预览与导出共用同一套绘制代码）
-  AnnotationCanvasView.swift           长图编辑器的画布 NSView + SwiftUI 桥接
-  ScreenshotEditorModel.swift          长图编辑器状态、撤销 / 重做、导出
-  ScreenshotEditorView.swift           长图编辑器界面
-  ScreenshotEditorWindowController.swift 长图编辑器窗口与生命周期管理
+  LongImageEditorLayout.swift          滚动截图结果在遮罩编辑里的等比摆放（给工具栏留空间，最大 1:1 不放大）
   PinWindowController.swift            固定到屏幕的浮窗
   ScreenshotController.swift           菜单栏 / 快捷键的统一入口
   ScreenshotSupport.swift              偏好设置、剪贴板与保存

@@ -121,12 +121,18 @@ final class ScreenCaptureService {
     }
 
     /// Captures an entire display at native pixel resolution.
-    func captureDisplay(_ displayID: CGDirectDisplayID) async throws -> CGImage {
+    ///
+    /// - Parameter excludedWindows: Windows of this app that must not appear in the capture (the
+    ///   scrolling-capture frame indicator and its HUD).
+    func captureDisplay(
+        _ displayID: CGDirectDisplayID,
+        excluding excludedWindows: [SCWindow] = []
+    ) async throws -> CGImage {
         let content = try await shareableContent()
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else {
             throw ScreenCaptureError.displayNotFound
         }
-        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let filter = SCContentFilter(display: display, excludingWindows: excludedWindows)
         let scale = backingScale(for: displayID)
         let configuration = Self.makeConfiguration()
         configuration.width = max(1, Int((CGFloat(display.width) * scale).rounded()))
@@ -162,14 +168,14 @@ final class ScreenCaptureService {
 
     /// Captures a rectangle expressed in Cocoa global coordinates. Selections spanning several
     /// displays are captured per display and composited into a single image.
-    func captureRegion(_ cocoaRect: CGRect) async throws -> CGImage {
+    func captureRegion(_ cocoaRect: CGRect, excluding excludedWindows: [SCWindow] = []) async throws -> CGImage {
         let rect = cocoaRect.standardized.integral
         guard rect.width >= 1, rect.height >= 1 else { throw ScreenCaptureError.emptySelection }
         guard let involved = Self.displays(intersecting: rect) else { throw ScreenCaptureError.emptySelection }
 
         var images: [CGDirectDisplayID: CGImage] = [:]
         for part in involved {
-            images[part.displayID] = try await captureDisplay(part.displayID)
+            images[part.displayID] = try await captureDisplay(part.displayID, excluding: excludedWindows)
         }
         guard let composited = Self.compositeRegion(rect, images: images, scaleFor: { [weak self] id in
             self?.backingScale(for: id) ?? 2
@@ -177,6 +183,15 @@ final class ScreenCaptureService {
             throw ScreenCaptureError.emptySelection
         }
         return composited
+    }
+
+    /// Resolves the ScreenCaptureKit windows behind the given AppKit window numbers so a capture
+    /// can leave this app's floating capture UI out of the picture.
+    func shareableWindows(forWindowNumbers windowNumbers: [Int]) async -> [SCWindow] {
+        guard !windowNumbers.isEmpty else { return [] }
+        guard let content = try? await shareableContent() else { return [] }
+        let ids = Set(windowNumbers.map { CGWindowID($0) })
+        return content.windows.filter { ids.contains($0.windowID) }
     }
 
     /// Displays whose frame intersects the given Cocoa-global rectangle, with the intersection.
